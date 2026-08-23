@@ -184,13 +184,16 @@ def quantize_key_mixed(
     data = key_states.transpose(-1, -2).contiguous()
     if padded_tokens > tokens:
         data = torch.cat((data, data[..., -1:].expand(-1, -1, -1, padded_tokens - tokens)), dim=-1)
-    grouped = data.reshape(batch, heads, head_dim, groups, group_size).float()
+    # Match Kitty's FP16 fake-quantization arithmetic exactly. In particular,
+    # range division and .round() near half-way boundaries must not silently
+    # run in FP32, or packed Dart and the simulation produce different codes.
+    grouped = data.reshape(batch, heads, head_dim, groups, group_size)
     minimum = grouped.amin(dim=-1)
     maximum = grouped.amax(dim=-1)
     promoted = mask.unsqueeze(-1)
     qmax = torch.where(promoted, torch.full_like(minimum, (1 << promote_bits) - 1), torch.full_like(minimum, 3.0))
-    scale = (maximum - minimum) / qmax
-    scale = torch.where(scale > 1e-12, scale, torch.ones_like(scale))
+    eps = 1e-4 if key_states.dtype in (torch.float16, torch.bfloat16) else 1e-6
+    scale = (maximum - minimum).clamp(min=eps) / qmax
     quantized = ((grouped - minimum.unsqueeze(-1)) / scale.unsqueeze(-1)).round()
     quantized = torch.minimum(torch.maximum(quantized, torch.zeros_like(quantized)), qmax.unsqueeze(-1)).to(torch.uint8)
     packed_tokens = (group_size + 3) // 4

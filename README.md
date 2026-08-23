@@ -154,20 +154,55 @@ per-page path.
 
 The local reproduction runner mirrors Kitty's accuracy matrix (`K16V16`,
 `KIVI-K2V2`, `KIVI-K2V2*`, `Kitty`, and `Kitty-Pro`) through the installed
-`lm-eval` tasks. It uses `local_tokens=buffer_length` so the newest Q/Local
-buffer remains dense, matching Kitty's simulation lifecycle:
+`lm-eval` tasks. Dart keeps Kitty's one-token key PostQuant delay and an exact
+128-token value Local buffer; these distinct K/V boundaries are required to
+match the simulation lifecycle:
 
 ```bash
 python examples/reproduce_kitty.py \
-  --model /opt/model/Qwen/Qwen3-8B \
+  --model /opt/model/Qwen/Qwen-8B \
   --task gsm8k_cot_llama --variant kitty-pro \
-  --device cuda:0 --dtype fp16 --repeats 3 --max-new-tokens 4096
+  --backend kitty-reference --protocol paper \
+  --device cuda:0 --dtype fp16 --repeats 10 --max-new-tokens 4096
 ```
 
-Use `--limit 1` for a smoke run. Results and per-repeat samples are written
-under `results/kitty_repro/`; the command records the model, task, seed, cache
-configuration, PyTorch version, and device so a full paper-scale run can be
-audited separately from a smoke result.
+`--backend kitty-reference` executes the checked-in Kitty simulation semantics;
+`--backend dart` runs the transported Dart cache. `--protocol paper` uses the
+sampling settings stated in Section 5.1 and the 25% Kitty-Pro ratio from Table
+3. `--protocol artifact` preserves the checked-in script's 20% ratio and lets
+the task YAML control sampling. This distinction is intentional: the paper and
+artifact disagree on both fields. Use `--limit 1` for a smoke run; limited runs
+are isolated under `smoke_limit_1` and cannot be mistaken for full results.
+
+The target cells, environment, known artifact conflicts, and Figure 4/5 setup
+are recorded in `experiments/kitty_paper_manifest.json`. Audit completed full
+results against the paper's reported maximum-deviation ranges with:
+
+```bash
+python examples/check_kitty_reproduction.py \
+  --results results/kitty_repro --table table3 \
+  --model-key Qwen3-8B --model-dir Qwen-8B \
+  --protocol paper --backend kitty-reference
+```
+
+Each repeat is checkpointed. Resumption only accepts an identical experiment
+signature, including task limit and generation length. Result JSON records all
+four seeds, cache settings, protocol, Python/PyTorch/Transformers/lm-eval/CUDA
+versions, and GPU name.
+
+For the paper's system-side generation comparison, use the local benchmark
+counterpart. It also supports `--cache kitty-reference`, the Kitty simulation
+cache, for a direct semantic baseline:
+
+```bash
+python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
+  --cache dart --batch-size 32 --max-seq-len 8192 \
+  --warmup-runs 2 --repeat-runs 3 --device cuda:0
+```
+
+The benchmark reports generated tokens/s, peak memory, storage ratio, and a
+prefix of generated token IDs; `kitty-reference` is the simulation cache and
+does not claim the custom Kitty Triton engine's throughput.
 
 ## Reference provenance
 

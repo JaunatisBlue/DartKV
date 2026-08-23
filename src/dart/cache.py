@@ -62,6 +62,7 @@ class DartKVCacheConfig:
     page_size: int = 128
     hold_partial_pages: bool = False
     local_tokens: int = 0
+    value_local_tokens: int = 0
     promote_bits: int = 4
     promote_ratio: float = 0.0
     channel_selection: str = "magnitude"
@@ -83,6 +84,8 @@ class DartKVCacheConfig:
             raise ValueError("page_size must be positive")
         if not isinstance(self.local_tokens, int) or self.local_tokens < 0:
             raise ValueError("local_tokens must be a non-negative integer")
+        if not isinstance(self.value_local_tokens, int) or self.value_local_tokens < 0:
+            raise ValueError("value_local_tokens must be a non-negative integer")
         if self.promote_bits != 4:
             raise ValueError("the reference mixed representation currently supports promote_bits=4")
         if not 0.0 <= self.promote_ratio <= 1.0:
@@ -159,6 +162,17 @@ class DartKVCache:
     def update(self, key_states: torch.Tensor, value_states: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Append a chunk and return the materialized cache contents."""
 
+        self.append(key_states, value_states)
+        return self.get()
+
+    def append(self, key_states: torch.Tensor, value_states: torch.Tensor) -> None:
+        """Append a chunk without materializing the complete cache.
+
+        This is used by adapters that need Kitty's post-quantization return
+        semantics: attention consumes a pre-quantization snapshot while the
+        packed backing store is prepared for the next model step.
+        """
+
         self._validate_inputs(key_states, value_states)
         key_states = key_states.detach().contiguous()
         value_states = value_states.detach().contiguous()
@@ -174,7 +188,6 @@ class DartKVCache:
         self._seen_tokens += chunk_length
         self._layout_version += 1
         self._invalidate_page_descriptors()
-        return self.get()
 
     def get(self) -> Tuple[torch.Tensor, torch.Tensor]:
         if self._seen_tokens == 0:
@@ -358,6 +371,10 @@ class DartKVCache:
             raise ValueError("all updates must keep batch/head/head_dim, dtype, and device unchanged")
 
     def _append_remainder(self, key_states: torch.Tensor, value_states: torch.Tensor) -> None:
+        if self.config.value_local_tokens:
+            self._append_key_remainder(key_states)
+            self._append_value_remainder(value_states)
+            return
         if self.config.hold_partial_pages or self.config.local_tokens:
             if self._pending_key is not None:
                 key_states = torch.cat((self._pending_key, key_states), dim=-2)
@@ -374,14 +391,65 @@ class DartKVCache:
             stop = min(start + self.config.page_size, key_states.shape[-2])
             self._quantize_pages(key_states[..., start:stop, :], value_states[..., start:stop, :])
 
+    def _append_key_remainder(self, key_states: torch.Tensor) -> None:
+        """Append key states using Kitty's page-sized Q-buffer lifecycle."""
+
+        if (
+            self._seen_tokens > 0
+            and self._pending_key is None
+            and self.config.local_tokens == 1
+            and key_states.shape[-2] == 1
+            and self._key_segments
+            and not isinstance(self._key_segments[-1], torch.Tensor)
+        ):
+            # The accuracy simulator re-quantizes the final prefill page on the
+            # first decode call when prefill ended exactly on a page boundary.
+            # Preserve that observable (non-idempotent in FP16) artifact.
+            final_page = _materialize(self._key_segments.pop())
+            self._quantize_key_pages(final_page)
+        if self._pending_key is not None:
+            key_states = torch.cat((self._pending_key, key_states), dim=-2)
+        # Prefill flushes every complete page. During decoding the simulation's
+        # PostQuant path waits for the following token before packing the full
+        # Q-buffer, represented by ``local_tokens=1`` in the compatibility
+        # configuration.
+        local_tokens = 0 if self._seen_tokens == 0 else self.config.local_tokens
+        available_tokens = max(0, key_states.shape[-2] - local_tokens)
+        full_tokens = (available_tokens // self.config.page_size) * self.config.page_size
+        if full_tokens:
+            self._quantize_key_pages(key_states[..., :full_tokens, :])
+        self._pending_key = (
+            key_states[..., full_tokens:, :].clone()
+            if full_tokens < key_states.shape[-2]
+            else None
+        )
+
+    def _append_value_remainder(self, value_states: torch.Tensor) -> None:
+        """Append values while retaining exactly the newest Kitty Local buffer."""
+
+        if self._pending_value is not None:
+            value_states = torch.cat((self._pending_value, value_states), dim=-2)
+        quantized_tokens = max(0, value_states.shape[-2] - self.config.value_local_tokens)
+        if quantized_tokens:
+            self._quantize_value_segment(value_states[..., :quantized_tokens, :])
+        self._pending_value = (
+            value_states[..., quantized_tokens:, :].clone()
+            if quantized_tokens < value_states.shape[-2]
+            else None
+        )
+
     def _quantize_pages(self, key_states: torch.Tensor, value_states: torch.Tensor) -> None:
         page_size = self.config.page_size
         if key_states.shape[-2] != value_states.shape[-2]:
             raise RuntimeError("key/value page lengths diverged before quantization")
         for start in range(0, key_states.shape[-2], page_size):
             stop = min(start + page_size, key_states.shape[-2])
-            key_page = key_states[..., start:stop, :]
-            value_page = value_states[..., start:stop, :]
+            self._quantize_key_pages(key_states[..., start:stop, :])
+            self._quantize_value_segment(value_states[..., start:stop, :])
+
+    def _quantize_key_pages(self, key_states: torch.Tensor) -> None:
+        for start in range(0, key_states.shape[-2], self.config.page_size):
+            key_page = key_states[..., start:start + self.config.page_size, :]
             key_kwargs = {
                 "group_size": self.config.resolved_key_group_size,
                 "metadata_dtype": self.config.metadata_dtype,
@@ -401,14 +469,15 @@ class DartKVCache:
                     bits=self.config.resolved_key_bits,
                     **key_kwargs,
                 )
-            value_segment = quantize(
-                value_page,
-                bits=self.config.resolved_value_bits,
-                group_size=self.config.resolved_value_group_size,
-                metadata_dtype=self.config.metadata_dtype,
-            )
             self._key_segments.append(key_segment)
-            self._value_segments.append(value_segment)
+
+    def _quantize_value_segment(self, value_states: torch.Tensor) -> None:
+        self._value_segments.append(quantize(
+            value_states,
+            bits=self.config.resolved_value_bits,
+            group_size=self.config.resolved_value_group_size,
+            metadata_dtype=self.config.metadata_dtype,
+        ))
 
 
 def _materialize(segment: Segment) -> torch.Tensor:

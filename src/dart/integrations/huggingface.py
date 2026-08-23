@@ -20,9 +20,11 @@ class DartHFCache(Cache):
     """A standard Transformers cache facade backed by compressed Dart layers.
 
     ``update`` returns materialized tensors because standard eager/SDPA model
-    attention expects dense K/V tensors. The backing cache remains quantized;
-    this adapter is therefore a correctness and lifecycle milestone, not yet a
-    fused-memory attention implementation.
+    attention expects dense K/V tensors. It mirrors Kitty's ``PostQuant``
+    lifecycle: the current attention call receives the cache state before a
+    newly eligible page is quantized, while the backing store is packed for the
+    next call. This adapter is therefore a correctness and lifecycle milestone,
+    not yet a fused-memory attention implementation.
     """
 
     is_compileable = False
@@ -46,7 +48,14 @@ class DartHFCache(Cache):
         if layer is None:
             layer = DartKVCache(self.dart_config)
             self._layers[layer_idx] = layer
-        return layer.update(key_states, value_states)
+            keys_to_return = key_states.detach().clone()
+            values_to_return = value_states.detach().clone()
+        else:
+            prior_keys, prior_values = layer.get()
+            keys_to_return = torch.cat((prior_keys, key_states), dim=-2)
+            values_to_return = torch.cat((prior_values, value_states), dim=-2)
+        layer.append(key_states, value_states)
+        return keys_to_return, values_to_return
 
     def get_seq_length(self, layer_idx: Optional[int] = 0) -> int:
         if layer_idx is None:

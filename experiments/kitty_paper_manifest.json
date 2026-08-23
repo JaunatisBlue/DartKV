@@ -1,0 +1,149 @@
+{
+  "paper": {
+    "title": "Kitty: Accurate and Efficient 2-bit KV Cache Quantization with Dynamic Channel-wise Precision Boost",
+    "tables": [3, 4],
+    "figures": [4, 5]
+  },
+  "environment": {
+    "paper": {
+      "pytorch": "2.4.1",
+      "cuda": "12.1",
+      "flash_attention": "2.7.4.post1",
+      "qwen3_8b_gpu": "NVIDIA A100"
+    },
+    "local_model_aliases": {
+      "Qwen3-8B": "/opt/model/Qwen/Qwen-8B"
+    }
+  },
+  "common": {
+    "key_bits": 2,
+    "value_bits": 2,
+    "promote_bits": 4,
+    "group_size": 128,
+    "buffer_length": 128,
+    "sink_length": 32,
+    "max_new_tokens": 4096,
+    "sampling": {
+      "do_sample": true,
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20
+    },
+    "seeds": {
+      "random": 0,
+      "numpy": 1234,
+      "torch": 1234,
+      "fewshot": 1234
+    }
+  },
+  "variants": {
+    "fp16": {"paper_label": "K16V16", "sink_length": 0, "promote_ratio": 0.0},
+    "kivi-2": {"paper_label": "KIVI-K2V2", "sink_length": 0, "promote_ratio": 0.0},
+    "kivi-2-sink": {"paper_label": "KIVI-K2V2*", "sink_length": 32, "promote_ratio": 0.0},
+    "kitty": {"paper_label": "Kitty", "sink_length": 32, "promote_ratio": 0.125},
+    "kitty-pro": {"paper_label": "Kitty-Pro", "sink_length": 32, "promote_ratio": 0.25}
+  },
+  "tasks": {
+    "gsm8k_cot_llama": {"paper_name": "GSM8K", "fewshot": 8, "metric": "exact_match,strict-match"},
+    "minerva_math_algebra": {"paper_name": "MATH-Algebra", "fewshot": 4, "metric": "exact_match,none"},
+    "humaneval_instruct": {"paper_name": "HumanEval", "fewshot": 0, "metric": "pass@1,create_test"},
+    "gpqa_diamond_cot_n_shot": {"paper_name": "GPQA-Diamond", "fewshot": 5, "metric": "exact_match,none"},
+    "aime24": {"paper_name": "AIME24", "fewshot": 0, "metric": "exact_match,none", "max_new_tokens": 32768},
+    "aime25": {"paper_name": "AIME25", "fewshot": 0, "metric": "exact_match,none", "max_new_tokens": 32768}
+  },
+  "table3": {
+    "Qwen3-8B": {
+      "fp16": {"gsm8k_cot_llama": [94.79, 0.71], "minerva_math_algebra": [88.26, 0.45], "humaneval_instruct": [84.82, 3.72], "gpqa_diamond_cot_n_shot": [40.71, 2.96], "average": 77.15},
+      "kivi-2": {"gsm8k_cot_llama": [89.13, 0.51], "minerva_math_algebra": [47.29, 0.20], "humaneval_instruct": [76.89, 3.11], "gpqa_diamond_cot_n_shot": [32.24, 3.16], "average": 61.39},
+      "kivi-2-sink": {"gsm8k_cot_llama": [89.71, 0.63], "minerva_math_algebra": [74.92, 1.83], "humaneval_instruct": [78.54, 2.56], "gpqa_diamond_cot_n_shot": [36.02, 3.27], "average": 69.80},
+      "kitty": {"gsm8k_cot_llama": [93.61, 0.58], "minerva_math_algebra": [85.12, 1.54], "humaneval_instruct": [81.77, 1.89], "gpqa_diamond_cot_n_shot": [39.39, 4.18], "average": 74.97},
+      "kitty-pro": {"gsm8k_cot_llama": [94.34, 0.48], "minerva_math_algebra": [88.12, 1.26], "humaneval_instruct": [81.34, 3.41], "gpqa_diamond_cot_n_shot": [40.92, 5.00], "average": 76.18}
+    },
+    "Qwen3-14B": {
+      "fp16": {"gsm8k_cot_llama": [94.69, 0.45], "minerva_math_algebra": [90.68, 0.14], "humaneval_instruct": [86.18, 2.03], "gpqa_diamond_cot_n_shot": [47.62, 3.74], "average": 79.79},
+      "kivi-2": {"gsm8k_cot_llama": [75.82, 1.97], "minerva_math_algebra": [83.66, 1.01], "humaneval_instruct": [83.74, 0.41], "gpqa_diamond_cot_n_shot": [41.50, 0.34], "average": 71.18},
+      "kivi-2-sink": {"gsm8k_cot_llama": [89.56, 0.94], "minerva_math_algebra": [83.74, 0.59], "humaneval_instruct": [85.98, 1.83], "gpqa_diamond_cot_n_shot": [45.24, 2.89], "average": 76.13},
+      "kitty": {"gsm8k_cot_llama": [94.67, 0.94], "minerva_math_algebra": [90.31, 0.93], "humaneval_instruct": [88.21, 2.24], "gpqa_diamond_cot_n_shot": [47.11, 4.25], "average": 80.08}
+    },
+    "Qwen3-32B": {
+      "fp16": {"gsm8k_cot_llama": [91.74, 0.99], "minerva_math_algebra": [84.84, 0.93], "humaneval_instruct": [85.98, 1.22], "gpqa_diamond_cot_n_shot": [48.81, 1.87], "average": 77.84},
+      "kivi-2": {"gsm8k_cot_llama": [88.17, 0.38], "minerva_math_algebra": [59.70, 0.81], "humaneval_instruct": [84.76, 0.61], "gpqa_diamond_cot_n_shot": [44.22, 1.19], "average": 69.21},
+      "kivi-2-sink": {"gsm8k_cot_llama": [89.31, 0.91], "minerva_math_algebra": [74.92, 0.45], "humaneval_instruct": [85.37, 2.44], "gpqa_diamond_cot_n_shot": [48.98, 2.55], "average": 74.65},
+      "kitty": {"gsm8k_cot_llama": [91.56, 0.58], "minerva_math_algebra": [83.80, 0.62], "humaneval_instruct": [86.28, 5.79], "gpqa_diamond_cot_n_shot": [47.45, 1.02], "average": 77.27}
+    },
+    "LLaMA3.1-8B-Instruct": {
+      "fp16": {"gsm8k_cot_llama": [76.75, 1.16], "minerva_math_algebra": [47.15, 0.48], "humaneval_instruct": [63.96, 3.11], "gpqa_diamond_cot_n_shot": [26.94, 5.00], "average": 53.70},
+      "kivi-2": {"gsm8k_cot_llama": [63.58, 0.63], "minerva_math_algebra": [31.45, 0.62], "humaneval_instruct": [55.30, 8.72], "gpqa_diamond_cot_n_shot": [23.88, 8.57], "average": 43.55},
+      "kivi-2-sink": {"gsm8k_cot_llama": [71.04, 0.83], "minerva_math_algebra": [44.12, 0.62], "humaneval_instruct": [56.71, 4.88], "gpqa_diamond_cot_n_shot": [23.67, 3.88], "average": 48.89},
+      "kitty": {"gsm8k_cot_llama": [75.99, 0.96], "minerva_math_algebra": [45.97, 1.57], "humaneval_instruct": [60.00, 5.85], "gpqa_diamond_cot_n_shot": [25.41, 3.47], "average": 51.84},
+      "kitty-pro": {"gsm8k_cot_llama": [75.51, 1.06], "minerva_math_algebra": [47.37, 0.90], "humaneval_instruct": [61.65, 5.43], "gpqa_diamond_cot_n_shot": [25.82, 3.78], "average": 52.59}
+    },
+    "LLaMA3.3-70B-Instruct": {
+      "fp16": {"gsm8k_cot_llama": [94.92, 0.30], "minerva_math_algebra": [71.58, 1.12], "humaneval_instruct": [83.13, 2.03], "gpqa_diamond_cot_n_shot": [45.92, 2.55], "average": 73.89},
+      "kivi-2": {"gsm8k_cot_llama": [93.91, 0.56], "minerva_math_algebra": [66.05, 0.76], "humaneval_instruct": [79.07, 2.24], "gpqa_diamond_cot_n_shot": [45.07, 5.44], "average": 71.03},
+      "kivi-2-sink": {"gsm8k_cot_llama": [94.77, 0.30], "minerva_math_algebra": [69.64, 0.81], "humaneval_instruct": [82.72, 2.85], "gpqa_diamond_cot_n_shot": [47.11, 2.38], "average": 73.56},
+      "kitty": {"gsm8k_cot_llama": [95.05, 0.63], "minerva_math_algebra": [70.35, 0.59], "humaneval_instruct": [83.13, 1.02], "gpqa_diamond_cot_n_shot": [45.58, 3.23], "average": 73.53},
+      "kitty-pro": {"gsm8k_cot_llama": [95.00, 0.23], "minerva_math_algebra": [70.77, 0.59], "humaneval_instruct": [82.72, 0.81], "gpqa_diamond_cot_n_shot": [46.94, 3.06], "average": 73.86}
+    }
+  },
+  "table4": {
+    "Qwen3-8B": {
+      "fp16": {"aime24": [71.67, 15.00], "aime25": [66.00, 7.33], "average": 68.84},
+      "kivi-2": {"aime24": [57.00, 7.00], "aime25": [52.33, 9.00], "average": 54.67},
+      "kivi-2-sink": {"aime24": [67.67, 9.00], "aime25": [57.67, 9.00], "average": 62.67},
+      "kitty": {"aime24": [70.67, 7.33], "aime25": [59.67, 10.33], "average": 65.17}
+    },
+    "Qwen3-14B": {
+      "fp16": {"aime24": [80.67, 7.33], "aime25": [69.33, 7.33], "average": 75.00},
+      "kivi-2": {"aime24": [69.00, 9.00], "aime25": [55.33, 8.67], "average": 62.17},
+      "kivi-2-sink": {"aime24": [74.67, 8.00], "aime25": [61.33, 8.67], "average": 68.00},
+      "kitty": {"aime24": [75.67, 4.33], "aime25": [67.33, 9.33], "average": 71.50}
+    },
+    "Qwen3-32B": {
+      "fp16": {"aime24": [81.67, 5.00], "aime25": [72.59, 7.41], "average": 77.13},
+      "kivi-2": {"aime24": [73.00, 9.67], "aime25": [57.41, 9.26], "average": 65.21},
+      "kivi-2-sink": {"aime24": [79.00, 9.00], "aime25": [59.05, 12.38], "average": 69.03},
+      "kitty": {"aime24": [79.67, 9.67], "aime25": [69.26, 9.26], "average": 74.47}
+    }
+  },
+  "artifact_conflicts": [
+    {
+      "field": "kitty_pro_ratio",
+      "paper": 0.25,
+      "artifact": 0.2,
+      "source": "accuracy_simulation/accuracy_eval.sh"
+    },
+    {
+      "field": "sampling",
+      "paper": "temperature=0.6, top_p=0.95, top_k=20",
+      "artifact": "runner defers to task YAML; the bundled/current GSM8K and MATH YAML use greedy decoding",
+      "source": "accuracy_simulation runner and lm-eval task YAML"
+    },
+    {
+      "field": "cuda_arch",
+      "paper": "A100 for Qwen3-8B",
+      "artifact": "accuracy_eval.sh exports TORCH_CUDA_ARCH_LIST=9.0 (H100) and comments that A100 needs 8.0",
+      "source": "accuracy_simulation/accuracy_eval.sh"
+    },
+    {
+      "field": "generation_length_argument",
+      "paper": "maximum generated tokens",
+      "artifact": "passes max_new_tokens together with max_length=None; upstream lm-eval 0.4.12 forwards the invalid max_length=None to Transformers",
+      "local_compatibility_mapping": "max_gen_toks, which lm-eval maps to Transformers max_new_tokens",
+      "source": "kitty_sim/eval/runner.py"
+    }
+  ],
+  "figure4": {
+    "model": "Qwen3-8B",
+    "tasks": ["gsm8k_cot_llama", "minerva_math_algebra"],
+    "promotion_ratios": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    "selection": ["random", "magnitude"]
+  },
+  "figure5": {
+    "model": "Qwen3-8B",
+    "gpu": "A100 80GB",
+    "max_sequence_length": 8192,
+    "prompt_tokens_approx": 100,
+    "reported_claims": {"batch_size_gain": "8x", "throughput_gain": "2.1x-4.1x"}
+  }
+}

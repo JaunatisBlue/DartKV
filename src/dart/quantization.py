@@ -167,7 +167,10 @@ def quantize(
     original_dim = data.shape[-1]
     groups = (original_dim + group_size - 1) // group_size
     padded_dim = groups * group_size
-    flat = data.reshape(-1, original_dim).float()
+    # Preserve the source dtype during range calculation and rounding. Kitty's
+    # accuracy simulator fake-quantizes FP16 tensors in FP16; promoting these
+    # operations to FP32 changes boundary rounding and can alter generation.
+    flat = data.reshape(-1, original_dim)
     if padded_dim > original_dim:
         # Replicating the final element avoids making padding alter the range.
         pad = flat[..., -1:].expand(-1, padded_dim - original_dim)
@@ -177,8 +180,8 @@ def quantize(
     minimum = grouped.amin(dim=-1)
     maximum = grouped.amax(dim=-1)
     qmax = float((1 << bits) - 1)
-    scale = (maximum - minimum) / qmax
-    scale = torch.where(scale > 1e-12, scale, torch.ones_like(scale))
+    eps = 1e-4 if data.dtype in (torch.float16, torch.bfloat16) else 1e-6
+    scale = (maximum - minimum).clamp(min=eps) / qmax
     quantized = ((grouped - minimum.unsqueeze(-1)) / scale.unsqueeze(-1)).round()
     quantized = quantized.clamp_(0, qmax).to(torch.uint8).reshape(*data.shape[:-1], padded_dim)
 

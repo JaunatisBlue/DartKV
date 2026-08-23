@@ -279,6 +279,35 @@ def test_huggingface_cache_adapter_reorders_without_losing_length():
     assert restored.shape == (2, 1, 4, 8)
 
 
+def test_huggingface_adapter_uses_kitty_post_quant_return_timing():
+    torch.manual_seed(61)
+    config = DartKVCacheConfig(
+        page_size=4,
+        local_tokens=4,
+        sink_tokens=2,
+        key_group_size=4,
+        value_group_size=8,
+        promote_ratio=0.25,
+        metadata_dtype=torch.float32,
+    )
+    cache = DartHFCache(config)
+    keys = torch.randn(1, 1, 11, 8)
+    values = torch.randn_like(keys)
+
+    prefill_keys, prefill_values = cache.update(keys, values, layer_idx=0)
+    torch.testing.assert_close(prefill_keys, keys, rtol=0, atol=0)
+    torch.testing.assert_close(prefill_values, values, rtol=0, atol=0)
+    stored_keys, stored_values = cache._layers[0].get()
+    assert not torch.equal(stored_keys, keys)
+    assert not torch.equal(stored_values, values)
+
+    next_keys = torch.randn(1, 1, 1, 8)
+    next_values = torch.randn_like(next_keys)
+    returned_keys, returned_values = cache.update(next_keys, next_values, layer_idx=0)
+    torch.testing.assert_close(returned_keys, torch.cat((stored_keys, next_keys), dim=-2), rtol=0, atol=0)
+    torch.testing.assert_close(returned_values, torch.cat((stored_values, next_values), dim=-2), rtol=0, atol=0)
+
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available")
 def test_cache_runs_on_gpu():
     key = torch.randn(1, 1, 3, 16, device="cuda", dtype=torch.float16)
