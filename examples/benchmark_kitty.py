@@ -20,18 +20,25 @@ from dart import DartKVCacheConfig
 from dart.integrations import DartHFCache
 
 
-DEFAULT_PROMPT = (
-    "Given the following problem, think step by step and give a final answer to the problem. "
-    "Problem: If there are 3 cars in the parking lot and 2 more cars arrive, how many cars "
-    "are in the parking lot? The final answer is"
-)
+DEFAULT_PROMPT = None
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
     parser.add_argument("--cache", choices=("dense", "dart", "kitty-reference"), default="dart")
-    parser.add_argument("--prompt", default=DEFAULT_PROMPT)
+    parser.add_argument(
+        "--prompt",
+        default=DEFAULT_PROMPT,
+        help="Override the Kitty reference prompt; omitted uses prompt-choice below",
+    )
+    parser.add_argument("--prompt-choice", type=int, choices=(1, 2, 3), default=1)
+    parser.add_argument(
+        "--chat-template",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Apply the model chat template as in Kitty's latency script",
+    )
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--max-seq-len", type=int, default=256)
     parser.add_argument("--warmup-runs", type=int, default=1)
@@ -44,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--value-group-size", type=int, default=128)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", choices=("fp16", "bf16", "fp32"), default="fp16")
-    parser.add_argument("--attn-implementation", choices=("eager", "sdpa"), default="eager")
+    parser.add_argument("--attn-implementation", choices=("eager", "sdpa"), default="sdpa")
     parser.add_argument("--seed", type=int, default=20260823)
     parser.add_argument("--output", default="results/kitty_latency")
     return parser
@@ -103,6 +110,15 @@ def _new_cache(args: argparse.Namespace):
     ))
 
 
+def _kitty_prompt(choice: int) -> tuple[str, str]:
+    reference_src = Path(__file__).resolve().parents[1] / "reference" / "code" / "Kitty" / "src"
+    if str(reference_src) not in sys.path:
+        sys.path.insert(0, str(reference_src))
+    from kitty_sim.cli.utils_cli import get_prompt
+
+    return get_prompt(choice)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if min(args.batch_size, args.max_seq_len, args.warmup_runs, args.repeat_runs) <= 0:
@@ -124,7 +140,15 @@ def main(argv: list[str] | None = None) -> int:
         local_files_only=True,
         attn_implementation=args.attn_implementation,
     ).to(device).eval()
-    texts = [args.prompt] * args.batch_size
+    task_name, reference_prompt = _kitty_prompt(args.prompt_choice)
+    prompt = args.prompt if args.prompt is not None else reference_prompt
+    texts = [prompt] * args.batch_size
+    if args.chat_template:
+        texts = tokenizer.apply_chat_template(
+            [[{"role": "user", "content": text}] for text in texts],
+            add_generation_prompt=True,
+            tokenize=False,
+        )
     inputs = tokenizer(texts, return_tensors="pt", padding=True)
     input_ids = inputs.input_ids.to(device)
     attention_mask = inputs.attention_mask.to(device)
@@ -186,6 +210,10 @@ def main(argv: list[str] | None = None) -> int:
     result = {
         "model": str(model_path),
         "cache": args.cache,
+        "task_name": task_name,
+        "prompt_choice": args.prompt_choice,
+        "prompt_source": "custom" if args.prompt is not None else "kitty-reference",
+        "chat_template": args.chat_template,
         "batch_size": args.batch_size,
         "prompt_tokens": int(input_ids.shape[-1]),
         "max_seq_len": args.max_seq_len,

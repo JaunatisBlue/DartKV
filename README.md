@@ -185,6 +185,16 @@ python examples/check_kitty_reproduction.py \
   --protocol paper --backend kitty-reference
 ```
 
+Figure 4's 11-point random/magnitude promotion sweep is resumable through:
+
+```bash
+python examples/sweep_kitty.py --model /opt/model/Qwen/Qwen-8B \
+  --device cuda:0 --repeats 3 --max-new-tokens 4096
+```
+
+Use `--limit 8` to validate the sweep wiring before scheduling the full
+GSM8K/MATH-Algebra curves.
+
 Each repeat is checkpointed. Resumption only accepts an identical experiment
 signature, including task limit and generation length. Result JSON records all
 four seeds, cache settings, protocol, Python/PyTorch/Transformers/lm-eval/CUDA
@@ -199,6 +209,10 @@ python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
   --cache dart --batch-size 32 --max-seq-len 8192 \
   --warmup-runs 2 --repeat-runs 3 --device cuda:0
 ```
+
+The default is Kitty's `prompt_choice=1` (the GSM8K few-shot prompt, roughly
+1179 Qwen3 chat-template tokens) with the chat template enabled. Use
+`--no-chat-template` only for an explicitly different protocol.
 
 The benchmark reports generated tokens/s, peak memory, storage ratio, and a
 prefix of generated token IDs; `kitty-reference` is the simulation cache and
