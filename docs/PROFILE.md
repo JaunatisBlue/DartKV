@@ -16,10 +16,11 @@ python examples/profile_reference.py \
   --promote-ratio 0.25 --repeats 3 --output results/profile
 ```
 
-需要 Chrome trace 时增加 `--trace`；trace 和 JSON 都保存在 `results/`，不会
-加入版本库。固定 seed 后，streaming 路径应与“对同一个量化 cache 先完整
-materialize 再 dense attention”的结果一致；另行报告的 quantization error
-则是量化 cache 与原始 FP16 K/V attention 的差异。
+需要 Chrome trace 时增加 `--trace`；它会分别导出 Python streaming 和 fused
+page attention 两份 trace，trace 和 JSON 都保存在 `results/`，不会加入版本库。
+固定 seed 后，streaming/fused 路径应与“对同一个量化 cache 先完整 materialize
+再 dense attention”的结果一致；另行报告的 quantization error 则是量化 cache
+与原始 FP16 K/V attention 的差异。
 
 ## 已验证的合成结果
 
@@ -84,7 +85,8 @@ python examples/run_qwen3_suite.py \
 segment，不能再把多个 page 合并为一个量化对象。布局、字段和 stride 约定见
 [`docs/PAGE_LAYOUT.md`](PAGE_LAYOUT.md)。`streamed_dart_attention` 和 profile
 入口在 CUDA 上会优先调用 `dart.triton_dequantize`；它仍然只是解包/反量化小
-kernel，不是 fused attention。
+kernel，不是 fused attention。`fused_dart_attention` 则把单 page 的解包、QK、
+online softmax 状态更新和 SV 放进同一个 Triton program。
 
 修正后的 A100 结果（`cuda:0`、seed `20260823`、`[1,8,1024,128]`、
 `Hq=32`、page/key-group/value-group 为 `128/128/64`、32 sink、25% promotion、
@@ -94,7 +96,14 @@ streaming `136.28 ms`。streaming 对量化 dense 的 max abs/RMSE 为
 `1.83e-4`/`3.59e-5`，packed storage `1,133,568` bytes，相对 dense
 `4,194,304` bytes 为 `3.70×`；streaming 临时峰值为 `35,510,784` bytes。
 
+同一配置下，单 token `fused_dart_attention` 为 `1.79 ms`，临时峰值为
+`34,951,168 bytes`，对量化 dense 的 max abs/RMSE 为 `1.53e-4`/`3.31e-5`。
+它相对于仍按 query head/page 发射解包的 Python streaming (`136.28 ms`) 约快
+`77×`，但仍比 dense attention (`0.151 ms`) 慢约一个数量级；这只是说明把
+page 解包、QK、online softmax、SV 放进同一个 page kernel 是正确方向，并不代表
+已经达到 Kitty 或最终 CUDA kernel 的性能。
+
 这个结果不能与第三轮的单 segment profile 直接比较：第四轮按真实 page 边界
-拆分，并且每个 query/KV head/page 组合都会触发一次小 Triton 解包。下一步的
-性能工作应把解包、QK、online softmax 和 SV 融合，减少 kernel launch，而不是
-优化这个小 kernel 的单独延迟。
+拆分，并且 fused reference 仍由 Python wrapper 顺序发射 page kernel。下一步的
+性能工作应把 page table、多个 page 的循环和请求 batch 进一步放进 kernel，而不
+是把这个小 kernel 的单独延迟当作最终端到端结果。

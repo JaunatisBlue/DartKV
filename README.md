@@ -115,7 +115,10 @@ kernels; see [docs/PROFILE.md](docs/PROFILE.md) for the recorded
 error, memory and profiling results. The page field order and element-stride
 contract is documented in [docs/PAGE_LAYOUT.md](docs/PAGE_LAYOUT.md); when
 Triton is importable on CUDA, the reference uses its small dequantization
-kernels before the still-unfused attention loop.
+kernels before the still-unfused attention loop. For a single query token,
+`dart.fused_dart_attention` additionally fuses page dequantization, QK, online
+softmax state update and SV within each page; it is an intermediate kernel
+oracle, not yet the model's Transformers attention backend.
 
 ## Minimal API
 

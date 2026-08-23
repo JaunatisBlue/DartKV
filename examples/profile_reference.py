@@ -13,6 +13,7 @@ from dart import (
     DartKVCache,
     DartKVCacheConfig,
     dense_attention,
+    fused_dart_attention,
     streamed_dart_attention,
     triton_available,
     triton_dequantize,
@@ -111,7 +112,9 @@ def main(argv: list[str] | None = None) -> int:
         values.repeat_interleave(args.query_heads // args.kv_heads, dim=1),
     )
     streamed = streamed_dart_attention(query, cache)
+    fused = fused_dart_attention(query, cache)
     stream_error = streamed.float() - expected.float()
+    fused_error = fused.float() - expected.float()
     quant_error = expected.float() - original_expected.float()
     segment_dequantize_ms, segment_dequantize_peak = _measure(
         lambda: _dequantize_segments(cache), device, args.repeats
@@ -119,8 +122,10 @@ def main(argv: list[str] | None = None) -> int:
     materialize_ms, materialize_peak = _measure(lambda: cache.get(), device, args.repeats)
     dense_ms, dense_peak = _measure(lambda: dense_attention(query, expanded_keys, expanded_values), device, args.repeats)
     streamed_ms, streamed_peak = _measure(lambda: streamed_dart_attention(query, cache), device, args.repeats)
+    fused_ms, fused_peak = _measure(lambda: fused_dart_attention(query, cache), device, args.repeats)
 
     trace_path = None
+    fused_trace_path = None
     if args.trace:
         output_dir = Path(args.output)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -131,6 +136,10 @@ def main(argv: list[str] | None = None) -> int:
         with torch.profiler.profile(activities=activities, record_shapes=True, profile_memory=True) as profiler:
             streamed_dart_attention(query, cache)
         profiler.export_chrome_trace(str(trace_path))
+        fused_trace_path = output_dir / f"dart_fused_attention_{args.tokens}_{args.promote_ratio:g}.json"
+        with torch.profiler.profile(activities=activities, record_shapes=True, profile_memory=True) as profiler:
+            fused_dart_attention(query, cache)
+        profiler.export_chrome_trace(str(fused_trace_path))
 
     result = {
         "device": str(device),
@@ -148,18 +157,24 @@ def main(argv: list[str] | None = None) -> int:
         "materialize_ms": materialize_ms,
         "dense_attention_ms": dense_ms,
         "streamed_attention_ms": streamed_ms,
+        "fused_page_attention_ms": fused_ms,
+        "fused_page_attention_backend": "triton" if device.type == "cuda" and triton_available() else "pytorch-fallback",
         "segment_dequantize_peak_bytes": segment_dequantize_peak,
         "materialize_peak_bytes": materialize_peak,
         "dense_peak_bytes": dense_peak,
         "streamed_peak_bytes": streamed_peak,
+        "fused_page_attention_peak_bytes": fused_peak,
         "max_abs_stream_error": float(stream_error.abs().max().cpu()),
         "rmse_stream_error": float(stream_error.square().mean().sqrt().cpu()),
+        "max_abs_fused_error": float(fused_error.abs().max().cpu()),
+        "rmse_fused_error": float(fused_error.square().mean().sqrt().cpu()),
         "max_abs_quantization_error": float(quant_error.abs().max().cpu()),
         "rmse_quantization_error": float(quant_error.square().mean().sqrt().cpu()),
         "cache_storage_bytes": cache.storage_bytes,
         "dense_cache_bytes": cache.dense_bytes,
         "cache_compression_ratio": cache.compression_ratio,
         "trace_path": str(trace_path) if trace_path else None,
+        "fused_trace_path": str(fused_trace_path) if fused_trace_path else None,
     }
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)

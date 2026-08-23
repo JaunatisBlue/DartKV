@@ -46,8 +46,10 @@ byte stride 使用。
 `dart.triton_dequantize(segment)` 在 CUDA 且 Triton 可导入时执行小型解包 kernel，
 否则回退到 PyTorch reference。当前支持 uniform key/value 和 mixed key，输出
 与 segment 的 `original_shape` 相同。`streamed_dart_attention` 已使用这个接口，
-但尚未融合 QK、online softmax 和 SV；因此 Triton 调用次数多时可能比纯 PyTorch
-reference 更慢。
+第四轮又增加 `fused_dart_attention`：它按 page 直接读取 packed fields，在同一
+个 Triton program 中完成该 page 的解包、QK、online softmax 状态更新和 SV；
+Python wrapper 只负责顺序遍历 page，尚未把 page table 也放入 kernel。因此它仍
+是单 token 的中间 reference，不是完整模型 fused attention。
 
 逐元素对照：
 
@@ -60,3 +62,14 @@ GPU 对照允许 FP16 affine expression 的一个舍入单位误差（`atol=4e-3
 因为 PyTorch reference 可能先在 metadata dtype 中完成乘法，而 Triton reference
 在 FP32 中累积后再写回输出 dtype。该误差不能替代 attention 输出和生成结果的
 回归检查。
+
+单 token fused reference 的入口：
+
+```python
+from dart import fused_dart_attention
+
+output = fused_dart_attention(query[:, :, -1:, :], cache, fallback=False)
+```
+
+`fallback=False` 会在 CPU、非单 token 或 Triton 不可用时直接报错，适合 kernel
+对照；默认 `fallback=True` 会回退到 PyTorch streaming reference。
