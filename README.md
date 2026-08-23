@@ -218,6 +218,14 @@ The benchmark reports generated tokens/s, peak memory, storage ratio, and a
 prefix of generated token IDs; `kitty-reference` is the simulation cache and
 does not claim the custom Kitty Triton engine's throughput.
 
+To reproduce Figure 5's increasing-batch protocol, run the subprocess-isolated
+sweep (an OOM batch is recorded and terminates the sweep cleanly):
+
+```bash
+python examples/sweep_benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
+  --cache dart --max-seq-len 8192 --device cuda:0
+```
+
 ## Reference provenance
 
 The design was informed by the Kitty artifact and the papers in
