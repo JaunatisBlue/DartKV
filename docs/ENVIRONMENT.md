@@ -14,11 +14,17 @@ This snapshot was captured on 2026-08-23 in `/home/yx/DartKV`.
 | Driver reported by `nvidia-smi` | 590.48.01 |
 | NumPy | 2.2.6 |
 | PyTest | 8.4.1 |
+| Transformers | 4.53.2 |
+| Safetensors | 0.8.0 |
+| Accelerate | 1.14.0 |
+| lm-eval (optional) | 0.4.12 |
 
 The PyTorch installation pulls its CUDA 12.6 runtime wheels from the package
 index. This is independent of the host toolkit, but still requires a
-compatible NVIDIA driver. The base implementation does not require
-`transformers`, Triton kernels, flash-attn, HQQ, or a container image.
+compatible NVIDIA driver. The reference path does not require flash-attn,
+HQQ, or a container image. The optional evaluation stack additionally pulls
+datasets, pandas, pyarrow and related metric packages. The verified local Qwen3 model is
+`/opt/model/Qwen/Qwen-8B`; model weights are external to this repository.
 
 To repeat the checks:
 

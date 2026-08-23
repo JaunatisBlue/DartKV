@@ -1,0 +1,93 @@
+# Second-stage experiment record
+
+The runner writes raw JSON to `results/`, which is intentionally ignored by
+Git because it contains generated text and machine-specific timings. The
+commands and representative observations below are kept in the repository so
+the experiment can be repeated.
+
+## Qwen-8B local generation
+
+Environment: `dartkv`, PyTorch 2.7.1+cu126, Transformers 4.53.2, one NVIDIA
+A100 80GB (`cuda:0`), BF16, eager attention, seed `20260823`. The local model
+snapshot is `/opt/model/Qwen/Qwen-8B`; its Hugging Face cache tree identifies
+revision `b968826d9c46dd6066d109eabc6255188de91218`.
+
+Prompt:
+
+```text
+Give a concise definition of a key-value cache.
+```
+
+Dense command:
+
+```bash
+python examples/run_qwen3.py \
+  --model /opt/model/Qwen/Qwen-8B --cache dense --device cuda:0 \
+  --dtype bf16 --max-new-tokens 4 --output results/qwen3
+```
+
+Dart command:
+
+```bash
+python examples/run_qwen3.py \
+  --model /opt/model/Qwen/Qwen-8B --cache dart --device cuda:0 \
+  --dtype bf16 --max-new-tokens 4 --sink-tokens 2 --page-size 8 \
+  --key-group-size 8 --value-group-size 64 --promote-ratio 0.25 \
+  --hold-partial-pages --output results/qwen3
+```
+
+Uniform K2V2 command (the same run with promotion disabled):
+
+```bash
+python examples/run_qwen3.py \
+  --model /opt/model/Qwen/Qwen-8B --cache dart --device cuda:0 \
+  --dtype bf16 --max-new-tokens 4 --sink-tokens 2 --page-size 8 \
+  --key-group-size 8 --value-group-size 64 --promote-ratio 0 \
+  --hold-partial-pages --output results/qwen3
+```
+
+All three modes generated the same four-token continuation, `A key-value cache`.
+The observed cache and timing values were:
+
+| mode | prefill ms | decode ms/token | peak allocated | cache bytes | ratio |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| dense | 573.95 | 52.26 | 16,397,081,600 | 1,916,928 | 1.00× |
+| Dart uniform K2V2 | 738.58 | 88.71 | 16,396,233,728 | 1,050,624 | 1.82× |
+| Dart mixed K2V2 + promoted K4 | 822.09 | 96.34 | 16,396,289,024 | 1,105,920 | 1.73× |
+
+All three modes generated the same four-token continuation, `A key-value
+cache`. The Dart storage reduction is a real packed-cache measurement for this
+short run. The latency is not a speedup result: `DartHFCache` materializes
+dense K/V tensors before standard model attention, and quantization work is
+included in the reference path. Longer prompts, repeated measurements, and a
+fused attention kernel are required before drawing performance conclusions.
+
+## Standard-task smoke evaluation
+
+The optional official `lm-eval==0.4.12` stack was installed separately from
+the core dependencies. A one-sample `hellaswag` smoke run was executed with
+the dense local model (the harness warns that `--limit` is for testing and the
+number is not a publishable metric):
+
+```bash
+HF_HOME=/opt/model/.cache/huggingface \
+HF_DATASETS_CACHE=/opt/model/.cache/huggingface/datasets \
+lm_eval --model hf \
+  --model_args pretrained=/opt/model/Qwen/Qwen-8B,dtype=bfloat16,local_files_only=True \
+  --device cuda:0 --tasks hellaswag --limit 1 --batch_size 1 \
+  --output_path results/lm-eval/qwen8b-hellaswag-1 --log_samples
+```
+
+The run completed successfully and produced `acc=0` and `acc_norm=0` for the
+single selected example, with raw sample output saved under
+`results/lm-eval/qwen8b-hellaswag-1`. This is an integration smoke check, not
+a quality claim; a meaningful result requires the full validation split and
+identical evaluation settings for every cache variant.
+
+## Reproducibility requirements
+
+Every future result should keep the JSON file from `results/` together with
+the exact command, model revision or local model path, tokenizer version,
+dtype, attention backend, seed, prompt/data identifier, input/new-token
+lengths, cache configuration, and GPU selection. Do not commit model weights,
+generated bulk data, or private tokens.

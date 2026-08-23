@@ -1,0 +1,3 @@
+# Optional standard-task evaluation stack; the core reference path does not
+# need this dependency set.
+lm-eval==0.4.12

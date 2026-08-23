@@ -1,19 +1,22 @@
 # DartKV
 
-DartKV is a small PyTorch reference implementation for experimenting with
-compressed key/value (KV) caches. The first version prioritizes clear tensor
-semantics and numerical checks over custom kernels. It supports asymmetric
-group-wise 2/4/8-bit quantization, bit-packed storage, an optional full
-precision sink prefix, and incremental cache updates.
+DartKV is a PyTorch reference implementation for experimenting with compressed
+key/value (KV) caches. It prioritizes clear tensor semantics and numerical
+checks over custom kernels. It supports asymmetric group-wise 2/4/8-bit
+quantization, bit-packed storage, separate key/value quantization axes, an
+optional full-precision sink prefix, page-sized buffering, and incremental
+cache updates.
 
 ## Scope of this baseline
 
 The cache accepts tensors in `[batch, kv_heads, sequence, head_dim]` layout.
-Each appended non-sink chunk is quantized independently along `head_dim`; the
-cache reconstructs the complete sequence when `get()` is called. This is a
-correctness baseline, not a production attention kernel. It intentionally does
-not depend on Kitty's private Transformers branch, Triton, flash-attn, HQQ, or
-any container image.
+Values are quantized along `head_dim`; keys use token groups along the sequence
+axis, which matches the reference K/V distinction used by the second-stage
+experiments. Dart promotion stores low two bits for every key channel and high
+bits only for selected channels. `DartHFCache` implements the public
+Transformers `Cache` lifecycle and materializes tensors for standard eager or
+SDPA attention. It is a correctness/reference path, not yet a fused attention
+kernel: the returned K/V tensors are dense temporaries during attention.
 
 ## Environment and installation
 
@@ -30,6 +33,10 @@ For an exact snapshot of the verified environment, use
 `requirements-lock.txt` in place of `requirements.txt` and then install the
 editable project.
 
+The standard-task smoke evaluator is optional and can be installed with
+`python -m pip install -r requirements-eval.txt`; it is not needed for the
+PyTorch cache or Qwen generation runner.
+
 If the environment is missing, create it first with `conda create -n dartkv
 python=3.10 -y`. Do not install the project into `base`. Verify the hardware
 and PyTorch runtime before running GPU work:
@@ -41,7 +48,8 @@ python -c 'import torch; print(torch.__version__, torch.version.cuda, torch.cuda
 
 The pinned PyTorch wheel was selected for the reference implementation. A
 compatible NVIDIA driver is still required; the code also runs on CPU for
-unit tests and small smoke tests.
+unit tests and small smoke tests. The model integration additionally uses
+`transformers==4.53.2`, `safetensors==0.8.0`, and `accelerate==1.14.0`.
 
 ## Smoke test and tests
 
@@ -67,7 +75,29 @@ python examples/run_baseline.py --device auto --tokens 256 --heads 8 --head-dim 
 
 This is deliberately a small reference experiment rather than a claim of
 paper-level model accuracy. Once its numbers are stable, a model-specific
-Transformers runner can be added without changing the cache/quantizer API.
+Transformers runner is available at `examples/run_qwen3.py`.
+
+## Local Qwen3 baseline
+
+The second-stage model runner uses the local model at
+`/opt/model/Qwen/Qwen-8B`, so it does not download weights during a run. It
+records generated text, prefill/decode timing, peak CUDA memory, and actual
+cache storage under `results/` (which is ignored by Git):
+
+```bash
+python examples/run_qwen3.py --model /opt/model/Qwen/Qwen-8B \
+  --cache dense --device cuda:0 --dtype bf16 --max-new-tokens 32
+
+python examples/run_qwen3.py --model /opt/model/Qwen/Qwen-8B \
+  --cache dart --device cuda:0 --dtype bf16 --sink-tokens 32 \
+  --page-size 128 --key-group-size 128 --value-group-size 64 \
+  --promote-ratio 0.25 --hold-partial-pages
+```
+
+The dense and Dart modes must use the same prompt, seed, dtype and attention
+backend when comparing generated output. Dart's current adapter deliberately
+materializes dense K/V for model attention; its storage result is meaningful,
+but its latency is not evidence of a fused-kernel speedup.
 
 ## Minimal API
 
@@ -85,14 +115,15 @@ all_keys, all_values = cache.get()
 ```
 
 `DartKVCache` owns detached inference tensors. `storage_bytes` counts tensor
-storage (packed values plus quantization metadata), while `dense_bytes` is the
-size of the equivalent uncompressed K and V tensors.
+storage (packed values, channel indices, and quantization metadata), while
+`dense_bytes` is the size of the equivalent uncompressed K and V tensors.
 
 ## Reference provenance
 
 The design was informed by the Kitty artifact and the papers in
-`reference/paper`, especially their use of group-wise affine quantization and
-sink/local buffering. Kitty is licensed under MIT; DartKV does not import its
-package or copy its CUDA/Triton implementation. Planned follow-up work is
-tracked separately: mixed-precision channel promotion, paged storage, model
-integration, and kernel profiling.
+`reference/paper`, especially their use of group-wise affine quantization,
+channel promotion, and sink/page buffering. Kitty is licensed under MIT;
+DartKV does not import its package or copy its CUDA/Triton implementation.
+The current model adapter is intentionally a PyTorch reference path. Planned
+follow-up work is fused dequantization/attention, stronger task evaluation,
+and profiling-guided Triton/CUDA kernels.

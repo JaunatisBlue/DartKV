@@ -73,6 +73,7 @@ class QuantizedTensor:
     group_size: int
     bits: int
     output_dtype: torch.dtype
+    axis: int = -1
 
     @property
     def groups(self) -> int:
@@ -96,11 +97,16 @@ class QuantizedTensor:
         """Reconstruct the tensor on the same device as the packed values."""
 
         unpacked = _unpack(self.values, self.bits, self.packed_dim)[..., : self.padded_dim]
-        outer_shape = self.original_shape[:-1]
+        axis = self.axis if self.axis >= 0 else len(self.original_shape) + self.axis
+        moved_shape = tuple(size for index, size in enumerate(self.original_shape) if index != axis) + (self.original_shape[axis],)
+        outer_shape = moved_shape[:-1]
         grouped = unpacked.reshape(*outer_shape, self.groups, self.group_size).to(self.scale.dtype)
         restored = grouped * self.scale.unsqueeze(-1) + self.zero_point.unsqueeze(-1)
         restored = restored.reshape(*outer_shape, self.padded_dim)[..., : self.original_dim]
-        return restored.to(dtype or self.output_dtype)
+        restored = restored.to(dtype or self.output_dtype)
+        if axis != len(self.original_shape) - 1:
+            restored = restored.movedim(-1, axis)
+        return restored
 
     def to(self, device: torch.device | str) -> "QuantizedTensor":
         return QuantizedTensor(
@@ -114,6 +120,7 @@ class QuantizedTensor:
             group_size=self.group_size,
             bits=self.bits,
             output_dtype=self.output_dtype,
+            axis=self.axis,
         )
 
 
@@ -130,6 +137,7 @@ def quantize(
     bits: int = 2,
     group_size: int = 64,
     metadata_dtype: Optional[torch.dtype] = None,
+    axis: int = -1,
 ) -> QuantizedTensor:
     """Quantize ``data`` along its last dimension.
 
@@ -152,6 +160,10 @@ def quantize(
         raise ValueError("quantize expects all values to be finite")
 
     original_shape = tuple(data.shape)
+    if not isinstance(axis, int) or not -data.ndim <= axis < data.ndim:
+        raise ValueError(f"axis must be in [-{data.ndim}, {data.ndim}), got {axis}")
+    axis = axis % data.ndim
+    data = data.movedim(axis, -1).contiguous()
     original_dim = data.shape[-1]
     groups = (original_dim + group_size - 1) // group_size
     padded_dim = groups * group_size
@@ -185,6 +197,7 @@ def quantize(
         group_size=group_size,
         bits=bits,
         output_dtype=data.dtype,
+        axis=axis,
     )
 
 
@@ -194,4 +207,17 @@ def dequantize(data: QuantizedTensor, *, dtype: Optional[torch.dtype] = None) ->
     return data.dequantize(dtype=dtype)
 
 
-__all__ = ["QuantizedTensor", "dequantize", "quantize"]
+def quantize_axis(
+    data: torch.Tensor,
+    axis: int,
+    *,
+    bits: int = 2,
+    group_size: int = 64,
+    metadata_dtype: Optional[torch.dtype] = None,
+) -> QuantizedTensor:
+    """Explicit spelling for quantization along a non-last tensor axis."""
+
+    return quantize(data, bits=bits, group_size=group_size, metadata_dtype=metadata_dtype, axis=axis)
+
+
+__all__ = ["QuantizedTensor", "dequantize", "quantize", "quantize_axis"]

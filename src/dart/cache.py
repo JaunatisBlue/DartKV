@@ -7,10 +7,11 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 
-from .quantization import QuantizedTensor, quantize
+from .mixed import MixedQuantizedKey, quantize_key_mixed
+from .quantization import QuantizedTensor, quantize, quantize_axis
 
 
-Segment = Union[torch.Tensor, QuantizedTensor]
+Segment = Union[torch.Tensor, QuantizedTensor, MixedQuantizedKey]
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,15 @@ class DartKVCacheConfig:
     group_size: int = 64
     sink_tokens: int = 0
     metadata_dtype: torch.dtype = torch.float16
+    key_bits: Optional[int] = None
+    value_bits: Optional[int] = None
+    key_group_size: Optional[int] = None
+    value_group_size: Optional[int] = None
+    page_size: int = 128
+    hold_partial_pages: bool = False
+    promote_bits: int = 4
+    promote_ratio: float = 0.0
+    channel_selection: str = "magnitude"
 
     def __post_init__(self) -> None:
         if self.bits not in (2, 4, 8):
@@ -34,8 +44,38 @@ class DartKVCacheConfig:
             raise ValueError("group_size must be positive")
         if self.sink_tokens < 0:
             raise ValueError("sink_tokens must be non-negative")
+        for name, value in (("key_bits", self.key_bits), ("value_bits", self.value_bits)):
+            if value is not None and value not in (2, 4, 8):
+                raise ValueError(f"{name} must be one of 2, 4, or 8")
+        for name, value in (("key_group_size", self.key_group_size), ("value_group_size", self.value_group_size)):
+            if value is not None and (not isinstance(value, int) or value <= 0):
+                raise ValueError(f"{name} must be a positive integer")
+        if self.page_size <= 0:
+            raise ValueError("page_size must be positive")
+        if self.promote_bits != 4:
+            raise ValueError("the reference mixed representation currently supports promote_bits=4")
+        if not 0.0 <= self.promote_ratio <= 1.0:
+            raise ValueError("promote_ratio must be in [0, 1]")
+        if self.channel_selection not in {"magnitude", "variance"}:
+            raise ValueError("channel_selection must be 'magnitude' or 'variance'")
         if self.metadata_dtype not in (torch.float16, torch.bfloat16, torch.float32, torch.float64):
             raise TypeError("metadata_dtype must be a floating-point torch dtype")
+
+    @property
+    def resolved_key_bits(self) -> int:
+        return self.key_bits if self.key_bits is not None else self.bits
+
+    @property
+    def resolved_value_bits(self) -> int:
+        return self.value_bits if self.value_bits is not None else self.bits
+
+    @property
+    def resolved_key_group_size(self) -> int:
+        return self.key_group_size if self.key_group_size is not None else self.group_size
+
+    @property
+    def resolved_value_group_size(self) -> int:
+        return self.value_group_size if self.value_group_size is not None else self.group_size
 
 
 class DartKVCache:
@@ -50,6 +90,8 @@ class DartKVCache:
         self.config = config or DartKVCacheConfig()
         self._key_segments: List[Segment] = []
         self._value_segments: List[Segment] = []
+        self._pending_key: Optional[torch.Tensor] = None
+        self._pending_value: Optional[torch.Tensor] = None
         self._shape: Optional[Tuple[int, int, int]] = None
         self._dtype: Optional[torch.dtype] = None
         self._device: Optional[torch.device] = None
@@ -79,28 +121,17 @@ class DartKVCache:
             self._key_segments.append(key_states[..., :sink_length, :].clone())
             self._value_segments.append(value_states[..., :sink_length, :].clone())
         if sink_length < chunk_length:
-            key_quantized = quantize(
-                key_states[..., sink_length:, :],
-                bits=self.config.bits,
-                group_size=self.config.group_size,
-                metadata_dtype=self.config.metadata_dtype,
-            )
-            value_quantized = quantize(
-                value_states[..., sink_length:, :],
-                bits=self.config.bits,
-                group_size=self.config.group_size,
-                metadata_dtype=self.config.metadata_dtype,
-            )
-            self._key_segments.append(key_quantized)
-            self._value_segments.append(value_quantized)
+            self._append_remainder(key_states[..., sink_length:, :], value_states[..., sink_length:, :])
         self._seen_tokens += chunk_length
         return self.get()
 
     def get(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        if not self._key_segments:
+        if self._seen_tokens == 0:
             raise RuntimeError("DartKVCache is empty; call update() before get()")
-        keys = torch.cat([_materialize(segment) for segment in self._key_segments], dim=-2)
-        values = torch.cat([_materialize(segment) for segment in self._value_segments], dim=-2)
+        key_segments = [*_materialize_segments(self._key_segments), self._pending_key] if self._pending_key is not None else _materialize_segments(self._key_segments)
+        value_segments = [*_materialize_segments(self._value_segments), self._pending_value] if self._pending_value is not None else _materialize_segments(self._value_segments)
+        keys = torch.cat(key_segments, dim=-2)
+        values = torch.cat(value_segments, dim=-2)
         return keys, values
 
     @property
@@ -113,7 +144,12 @@ class DartKVCache:
 
     @property
     def storage_bytes(self) -> int:
-        return sum(_segment_nbytes(segment) for segment in (*self._key_segments, *self._value_segments))
+        pending = 0
+        if self._pending_key is not None:
+            pending += self._pending_key.numel() * self._pending_key.element_size()
+        if self._pending_value is not None:
+            pending += self._pending_value.numel() * self._pending_value.element_size()
+        return sum(_segment_nbytes(segment) for segment in (*self._key_segments, *self._value_segments)) + pending
 
     @property
     def dense_bytes(self) -> int:
@@ -131,12 +167,18 @@ class DartKVCache:
 
         self._key_segments = [_segment_to(segment, device) for segment in self._key_segments]
         self._value_segments = [_segment_to(segment, device) for segment in self._value_segments]
+        if self._pending_key is not None:
+            self._pending_key = self._pending_key.to(device)
+        if self._pending_value is not None:
+            self._pending_value = self._pending_value.to(device)
         self._device = torch.device(device)
         return self
 
     def clear(self) -> None:
         self._key_segments.clear()
         self._value_segments.clear()
+        self._pending_key = None
+        self._pending_value = None
         self._shape = None
         self._dtype = None
         self._device = None
@@ -161,9 +203,57 @@ class DartKVCache:
         elif shape != self._shape or key_states.dtype != self._dtype or key_states.device != self._device:
             raise ValueError("all updates must keep batch/head/head_dim, dtype, and device unchanged")
 
+    def _append_remainder(self, key_states: torch.Tensor, value_states: torch.Tensor) -> None:
+        if self.config.hold_partial_pages:
+            if self._pending_key is not None:
+                key_states = torch.cat((self._pending_key, key_states), dim=-2)
+                value_states = torch.cat((self._pending_value, value_states), dim=-2)
+            full_tokens = (key_states.shape[-2] // self.config.page_size) * self.config.page_size
+            if full_tokens:
+                self._quantize_pages(key_states[..., :full_tokens, :], value_states[..., :full_tokens, :])
+            self._pending_key = key_states[..., full_tokens:, :].clone() if full_tokens < key_states.shape[-2] else None
+            self._pending_value = value_states[..., full_tokens:, :].clone() if full_tokens < value_states.shape[-2] else None
+            return
+        for start in range(0, key_states.shape[-2], self.config.page_size):
+            stop = min(start + self.config.page_size, key_states.shape[-2])
+            self._quantize_pages(key_states[..., start:stop, :], value_states[..., start:stop, :])
+
+    def _quantize_pages(self, key_states: torch.Tensor, value_states: torch.Tensor) -> None:
+        key_kwargs = {
+            "group_size": self.config.resolved_key_group_size,
+            "metadata_dtype": self.config.metadata_dtype,
+        }
+        if self.config.promote_ratio > 0.0:
+            key_segment: Segment = quantize_key_mixed(
+                key_states,
+                **key_kwargs,
+                promote_ratio=self.config.promote_ratio,
+                promote_bits=self.config.promote_bits,
+                strategy=self.config.channel_selection,
+            )
+        else:
+            key_segment = quantize_axis(
+                key_states,
+                axis=-2,
+                bits=self.config.resolved_key_bits,
+                **key_kwargs,
+            )
+        value_segment = quantize(
+            value_states,
+            bits=self.config.resolved_value_bits,
+            group_size=self.config.resolved_value_group_size,
+            metadata_dtype=self.config.metadata_dtype,
+        )
+        self._key_segments.append(key_segment)
+        self._value_segments.append(value_segment)
+
 
 def _materialize(segment: Segment) -> torch.Tensor:
     return segment if isinstance(segment, torch.Tensor) else segment.dequantize()
+
+
+def _materialize_segments(segments: List[Segment]) -> List[torch.Tensor]:
+    return [_materialize(segment) for segment in segments]
 
 
 def _segment_nbytes(segment: Segment) -> int:

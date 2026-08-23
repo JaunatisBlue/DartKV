@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from dart import dequantize, quantize
+from dart import dequantize, quantize, quantize_axis, quantize_key_mixed, select_key_channels
 
 
 @pytest.mark.parametrize("bits,tolerance", [(2, 0.55), (4, 0.12), (8, 0.01)])
@@ -32,3 +32,28 @@ def test_invalid_quantization_inputs():
         quantize(torch.ones(2, 3, dtype=torch.int32))
     with pytest.raises(ValueError, match="finite"):
         quantize(torch.tensor([[float("nan")]]))
+
+
+def test_quantize_axis_restores_original_layout():
+    torch.manual_seed(3)
+    source = torch.randn(2, 3, 9, 5)
+    packed = quantize_axis(source, axis=-2, bits=2, group_size=4, metadata_dtype=torch.float32)
+    restored = packed.dequantize()
+    assert restored.shape == source.shape
+    assert packed.scale.shape == (2, 3, 5, 3)
+    assert torch.max((source - restored).abs()).item() < 0.9
+
+
+def test_mixed_key_stores_only_promoted_high_bits():
+    torch.manual_seed(4)
+    source = torch.randn(1, 2, 17, 16)
+    mask, indices = select_key_channels(source, 0.25, strategy="magnitude")
+    assert mask.shape == (1, 2, 16)
+    assert indices.shape == (1, 2, 4)
+    mixed = quantize_key_mixed(source, group_size=8, promote_ratio=0.25, metadata_dtype=torch.float32)
+    restored = mixed.dequantize()
+    assert restored.shape == source.shape
+    assert mixed.high_values.shape[2] == 4
+    assert mixed.promote_mask.sum().item() == 8
+    assert mixed.nbytes < mixed.dense_nbytes
+    assert torch.max((source - restored).abs()).item() < 0.9

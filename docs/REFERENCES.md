@@ -10,6 +10,11 @@
   It uses one uniform bit width per appended chunk and keeps metadata in a
   floating-point tensor. It does not claim to reproduce Kitty's paged kernel
   layout or latency.
+- The second-stage path separates key token-axis groups from value
+  head-dimension groups, and adds a PyTorch implementation of low two-bit
+  storage plus selected four-bit key channels. `DartHFCache` uses the public
+  Transformers cache interface but returns materialized tensors to attention;
+  it is not a fused kernel.
 
 ## Papers
 

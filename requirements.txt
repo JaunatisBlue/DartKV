@@ -4,3 +4,6 @@
 torch==2.7.1
 numpy==2.2.6
 pytest==8.4.1
+transformers==4.53.2
+safetensors==0.8.0
+accelerate==1.14.0
