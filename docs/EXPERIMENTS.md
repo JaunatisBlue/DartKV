@@ -122,8 +122,9 @@ state。`[1,8,2048,128]`、32 query heads、128 page、128/64 K/V group、32 sin
 | Triton fused page-run（15 pages/launch） | 2.32 ms | 61,845,504 B | `1.53e-4` | `2.15e-5` |
 
 相对 Python page streaming，page-run reference 约快 `138×`，相对逐页 fused
-约减少 `47%` 延迟；相对 dense attention 仍慢约一个数量级。page-run 的构建耗时
-约 `1.01 ms`，属于 cache 生命周期成本，应在 append 后缓存。该差距仍来自
+约减少 `47%` 延迟；相对 dense attention 仍慢约一个数量级。后续重复 3 次的
+生命周期 profile 显示，首次 page table/page-run 构建为 `52.53 ms`/`0.89 ms`，
+缓存命中 lookup 仅 `0.0105 ms`/`0.0044 ms`，因此应在 append 后缓存。该差距仍来自
 packed metadata 访问、单 query-head program 和尚未融合的物理 page table/batch
 调度，不能把这组数据写成端到端模型加速结论。Chrome trace 可用 profile 脚本的
 `--trace` 导出 streaming 与 page-run attention 路径。

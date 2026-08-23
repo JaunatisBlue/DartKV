@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import torch
 
@@ -12,6 +12,9 @@ from .quantization import QuantizedTensor, quantize, quantize_axis
 
 
 Segment = Union[torch.Tensor, QuantizedTensor, MixedQuantizedKey]
+
+if TYPE_CHECKING:
+    from .page_table import DartPageRun, DartPageTable
 
 
 @dataclass(frozen=True)
@@ -121,10 +124,19 @@ class DartKVCache:
         self._dtype: Optional[torch.dtype] = None
         self._device: Optional[torch.device] = None
         self._seen_tokens = 0
+        self._layout_version = 0
+        self._page_table_cache: dict[torch.device, tuple[int, "DartPageTable"]] = {}
+        self._page_run_cache: dict[torch.device, tuple[int, tuple["DartPageRun", ...]]] = {}
 
     @property
     def seen_tokens(self) -> int:
         return self._seen_tokens
+
+    @property
+    def layout_version(self) -> int:
+        """Monotonic descriptor version changed by append, clear, or device move."""
+
+        return self._layout_version
 
     def get_seq_length(self) -> int:
         return self._seen_tokens
@@ -157,6 +169,8 @@ class DartKVCache:
         if sink_length < chunk_length:
             self._append_remainder(key_states[..., sink_length:, :], value_states[..., sink_length:, :])
         self._seen_tokens += chunk_length
+        self._layout_version += 1
+        self._invalidate_page_descriptors()
         return self.get()
 
     def get(self) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -239,12 +253,57 @@ class DartKVCache:
             )
         return metadata
 
-    def page_table(self, *, device: torch.device | str | None = None):
-        """Build device-resident page descriptors for the current segments."""
+    def page_table(
+        self,
+        *,
+        device: torch.device | str | None = None,
+        rebuild: bool = False,
+    ) -> "DartPageTable":
+        """Return cached device-resident page descriptors for current segments.
+
+        The cache is invalidated after every append, clear, or device move. Set
+        ``rebuild=True`` when a caller intentionally wants a fresh descriptor
+        object without changing the logical cache.
+        """
 
         from .page_table import DartPageTable
 
-        return DartPageTable.from_cache(self, device=device)
+        target = _descriptor_device(device, self._device)
+        cached = self._page_table_cache.get(target)
+        if cached is not None and not rebuild and cached[0] == self._layout_version:
+            return cached[1]
+        table = DartPageTable.from_cache(self, device=target)
+        self._page_table_cache[target] = (self._layout_version, table)
+        return table
+
+    def page_runs(
+        self,
+        *,
+        device: torch.device | str | None = None,
+        page_table: Optional["DartPageTable"] = None,
+        rebuild: bool = False,
+    ) -> tuple["DartPageRun", ...]:
+        """Return cached page-major uniform runs for the current segments.
+
+        ``device`` controls both descriptor and packed run placement. When a
+        caller supplies a custom/reordered page table, runs are rebuilt from
+        that table and are not inserted into the cache-owned default entry.
+        """
+
+        target = _descriptor_device(device, self._device)
+        if page_table is None:
+            cached = self._page_run_cache.get(target)
+            if cached is not None and not rebuild and cached[0] == self._layout_version:
+                return cached[1]
+            table = self.page_table(device=target, rebuild=rebuild)
+        else:
+            table = page_table
+        runs = table.uniform_quantized_runs(self)
+        if device is not None:
+            runs = tuple(run if run.device == target else run.to(target) for run in runs)
+        if page_table is None:
+            self._page_run_cache[target] = (self._layout_version, runs)
+        return runs
 
     def to(self, device: torch.device | str) -> "DartKVCache":
         """Move all backing tensors to ``device`` and return ``self``."""
@@ -255,7 +314,9 @@ class DartKVCache:
             self._pending_key = self._pending_key.to(device)
         if self._pending_value is not None:
             self._pending_value = self._pending_value.to(device)
-        self._device = torch.device(device)
+        self._device = _descriptor_device(device, self._device)
+        self._layout_version += 1
+        self._invalidate_page_descriptors()
         return self
 
     def clear(self) -> None:
@@ -267,6 +328,12 @@ class DartKVCache:
         self._dtype = None
         self._device = None
         self._seen_tokens = 0
+        self._layout_version += 1
+        self._invalidate_page_descriptors()
+
+    def _invalidate_page_descriptors(self) -> None:
+        self._page_table_cache.clear()
+        self._page_run_cache.clear()
 
     def _validate_inputs(self, key_states: torch.Tensor, value_states: torch.Tensor) -> None:
         if key_states.ndim != 4 or value_states.ndim != 4:
@@ -380,6 +447,16 @@ def _segment_nbytes(segment: Segment) -> int:
 
 def _segment_to(segment: Segment, device: torch.device | str) -> Segment:
     return segment.to(device) if isinstance(segment, QuantizedTensor) else segment.to(device)
+
+
+def _descriptor_device(
+    device: torch.device | str | None,
+    fallback: Optional[torch.device],
+) -> torch.device:
+    target = torch.device(device) if device is not None else (fallback or torch.device("cpu"))
+    if target.type == "cuda" and target.index is None:
+        target = torch.device("cuda", torch.cuda.current_device())
+    return target
 
 
 __all__ = ["DartKVCache", "DartKVCacheConfig", "DartPageMetadata", "DartSegmentLayout"]

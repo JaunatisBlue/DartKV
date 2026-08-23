@@ -689,12 +689,20 @@ def fused_dart_attention(
         raise ValueError("query heads must be divisible by cache KV heads")
     factor = scale if scale is not None else 1.0 / math.sqrt(head_dim)
     segments = cache.iter_segments()
-    table = page_table or cache.page_table(device=query.device)
+    supplied_page_table = page_table is not None
+    table = page_table if supplied_page_table else cache.page_table(device=query.device)
     if table.device != query.device:
         table = table.to(query.device)
     if table.page_count != len(segments) or table.seen_tokens != cache.seen_tokens:
         raise ValueError("page_table does not describe the current cache segments")
-    runs = tuple(table.uniform_quantized_runs(cache)) if page_runs is None else tuple(page_runs)
+    if page_runs is None:
+        runs = (
+            tuple(table.uniform_quantized_runs(cache))
+            if supplied_page_table
+            else cache.page_runs(device=query.device)
+        )
+    else:
+        runs = tuple(page_runs)
     run_by_start: dict[int, DartPageRun] = {}
     for run in runs:
         run.validate()

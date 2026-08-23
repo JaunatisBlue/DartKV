@@ -104,9 +104,20 @@ def main(argv: list[str] | None = None) -> int:
     _sync(device)
     page_table_ms = (time.perf_counter() - page_table_start) * 1000
     page_run_start = time.perf_counter()
-    page_runs = page_table.uniform_quantized_runs(cache)
+    page_runs = cache.page_runs(device=device)
     _sync(device)
     page_run_ms = (time.perf_counter() - page_run_start) * 1000
+    cache_lookup_repeats = max(args.repeats, 1)
+    lookup_start = time.perf_counter()
+    for _ in range(cache_lookup_repeats):
+        cache.page_table(device=device)
+    _sync(device)
+    page_table_cached_ms = (time.perf_counter() - lookup_start) * 1000 / cache_lookup_repeats
+    lookup_start = time.perf_counter()
+    for _ in range(cache_lookup_repeats):
+        cache.page_runs(device=device)
+    _sync(device)
+    page_run_cached_ms = (time.perf_counter() - lookup_start) * 1000 / cache_lookup_repeats
     # Keep the dense tensors for the numerical oracle, then measure the two
     # materialization stages separately. ``segment_dequantize`` includes the
     # packed unpack operation; ``materialize`` additionally concatenates pages.
@@ -167,7 +178,9 @@ def main(argv: list[str] | None = None) -> int:
         "seed": args.seed,
         "quantize_and_store_ms": quantize_ms,
         "page_table_build_ms": page_table_ms,
+        "page_table_cached_lookup_ms": page_table_cached_ms,
         "page_run_build_ms": page_run_ms,
+        "page_run_cached_lookup_ms": page_run_cached_ms,
         "page_run_count": len(page_runs),
         "page_run_pages": sum(run.page_count for run in page_runs),
         "segment_dequantize_ms": segment_dequantize_ms,

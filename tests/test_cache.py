@@ -134,6 +134,60 @@ def test_empty_page_table_is_valid_and_append_refreshes_metadata():
     assert table.seen_tokens == 5
 
 
+def test_page_descriptors_are_cached_and_invalidated_by_cache_lifecycle():
+    torch.manual_seed(55)
+    keys = torch.randn(2, 1, 9, 8)
+    cache = DartKVCache(DartKVCacheConfig(
+        page_size=4,
+        hold_partial_pages=True,
+        key_group_size=4,
+        value_group_size=4,
+        metadata_dtype=torch.float32,
+    ))
+    assert cache.layout_version == 0
+    empty_table = cache.page_table()
+    assert cache.page_table() is empty_table
+    cache.update(keys[..., :8, :], keys[..., :8, :])
+    assert cache.layout_version == 1
+    table = cache.page_table()
+    runs = cache.page_runs()
+    assert cache.page_table() is table
+    assert cache.page_runs() is runs
+    assert table.page_count == 2
+    assert len(runs) == 1 and runs[0].page_count == 2
+
+    cache.update(keys[..., 8:, :], keys[..., 8:, :])
+    assert cache.layout_version == 2
+    refreshed_table = cache.page_table()
+    refreshed_runs = cache.page_runs()
+    assert refreshed_table is not table
+    assert refreshed_runs is not runs
+    assert refreshed_table.page_count == 3
+    assert refreshed_runs[0].page_count == 2
+
+    rebuilt = cache.page_table(rebuild=True)
+    assert rebuilt is not refreshed_table
+    cache.to("cpu")
+    assert cache.layout_version == 3
+    moved_table = cache.page_table()
+    assert moved_table is not rebuilt
+    cache.clear()
+    assert cache.layout_version == 4
+    assert cache.page_table().page_count == 0
+
+
+def test_custom_reordered_page_table_does_not_replace_cache_owned_run():
+    torch.manual_seed(56)
+    keys = torch.randn(2, 1, 8, 8)
+    cache = DartKVCache(DartKVCacheConfig(page_size=4, key_group_size=4, value_group_size=4))
+    cache.update(keys, keys)
+    owned_runs = cache.page_runs()
+    reordered = cache.page_table().reorder(torch.tensor([1, 0])).validate()
+    custom_runs = cache.page_runs(page_table=reordered)
+    assert custom_runs is not owned_runs
+    assert cache.page_runs() is owned_runs
+
+
 def test_page_table_stacks_consecutive_uniform_pages_page_major():
     torch.manual_seed(53)
     keys = torch.randn(1, 2, 13, 16)
@@ -185,7 +239,9 @@ def test_huggingface_cache_adapter_reorders_without_losing_length():
     keys = torch.randn(2, 1, 3, 8)
     values = torch.randn_like(keys)
     cache.update(keys, values, layer_idx=0)
+    old_table = cache.page_table()
     cache.reorder_cache(torch.tensor([1, 1]))
+    assert cache.page_table() is not old_table
     assert cache.get_seq_length() == 3
     next_keys = keys[1:2].expand(2, -1, -1, -1)
     next_values = values[1:2].expand(2, -1, -1, -1)

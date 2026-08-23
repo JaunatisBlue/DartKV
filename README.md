@@ -138,6 +138,17 @@ all_keys, all_values = cache.get()
 `DartKVCache` owns detached inference tensors. `storage_bytes` counts tensor
 storage (packed values, channel indices, and quantization metadata), while
 `dense_bytes` is the size of the equivalent uncompressed K and V tensors.
+Page descriptors are lifecycle-cached by device and invalidated after append,
+`clear()` or `to(device)`:
+
+```python
+table = cache.page_table(device=keys.device)
+runs = cache.page_runs(device=keys.device)
+```
+
+The returned page runs are consumed by the single-token fused attention
+reference; mixed, sink, and pending boundary pages continue through the
+per-page path.
 
 ## Reference provenance
 

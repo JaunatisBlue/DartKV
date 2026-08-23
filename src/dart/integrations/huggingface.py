@@ -57,6 +57,30 @@ class DartHFCache(Cache):
     def get_max_cache_shape(self) -> None:
         return None
 
+    def page_table(
+        self,
+        layer_idx: int = 0,
+        *,
+        device: torch.device | str | None = None,
+        rebuild: bool = False,
+    ):
+        """Expose a layer's cached Dart page table to fused attention callers."""
+
+        layer = self._layers.get(layer_idx)
+        return layer.page_table(device=device, rebuild=rebuild) if layer is not None else None
+
+    def page_runs(
+        self,
+        layer_idx: int = 0,
+        *,
+        device: torch.device | str | None = None,
+        rebuild: bool = False,
+    ):
+        """Expose a layer's cached uniform page runs."""
+
+        layer = self._layers.get(layer_idx)
+        return layer.page_runs(device=device, rebuild=rebuild) if layer is not None else None
+
     def reorder_cache(self, beam_idx: torch.LongTensor) -> "DartHFCache":
         """Rebuild selected beams without retaining a dense fallback copy."""
 

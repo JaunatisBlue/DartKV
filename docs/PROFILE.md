@@ -113,10 +113,12 @@ streaming `136.28 ms`。streaming 对量化 dense 的 max abs/RMSE 为
 | Triton fused page（逐页） | 4.42 ms | 61,845,504 B | `1.53e-4` | `2.15e-5` |
 | Triton fused page-run（15 pages/launch） | 2.32 ms | 61,845,504 B | `1.53e-4` | `2.15e-5` |
 
-page-run 相对逐页 fused 约减少 47% 延迟；run 构建本身约 `1.01 ms`，应在 cache
-append 后缓存，不计入稳定 decode token latency。它相对 dense attention 仍慢约
-一个数量级，说明后续重点仍是更大的 query tile、物理 page table 和 mixed-run
-融合，而不是把这组 reference 数字解读为端到端模型加速。
+page-run 相对逐页 fused 约减少 47% 延迟；本次重复 3 次的首次构建为
+`page_table_build_ms=52.53 ms`、`page_run_build_ms=0.89 ms`，而缓存命中 lookup
+分别只有 `0.0105 ms` 与 `0.0044 ms`。因此两类描述都应在 cache append 后缓存，
+不计入稳定 decode token latency。它相对 dense attention 仍慢约一个数量级，说明
+后续重点仍是更大的 query tile、物理 page table 和 mixed-run 融合，而不是把这组
+reference 数字解读为端到端模型加速。
 
 这个结果不能与第三轮的单 segment profile 直接比较：第四轮按真实 page 边界
 拆分，并且 fused reference 仍由 Python wrapper 顺序发射 page kernel。下一步的
