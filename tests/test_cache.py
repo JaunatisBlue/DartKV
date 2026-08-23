@@ -73,6 +73,32 @@ def test_cache_separates_key_value_axes_and_flushes_pages():
     assert cache.storage_bytes < cache.dense_bytes
 
 
+def test_page_metadata_freezes_sequence_order_and_storage_strides():
+    torch.manual_seed(51)
+    keys = torch.randn(1, 2, 11, 12)
+    values = torch.randn_like(keys)
+    cache = DartKVCache(DartKVCacheConfig(
+        page_size=4,
+        hold_partial_pages=True,
+        sink_tokens=2,
+        key_group_size=4,
+        value_group_size=6,
+        promote_ratio=0.25,
+        metadata_dtype=torch.float32,
+    ))
+    cache.update(keys, values)
+    pages = cache.page_metadata()
+    assert [(page.sequence_start, page.token_count) for page in pages] == [(0, 2), (2, 4), (6, 4), (10, 1)]
+    assert pages[0].key.kind == pages[0].value.kind == "dense"
+    assert pages[1].key.kind == "mixed_key"
+    assert pages[1].value.kind == "quantized"
+    assert pages[1].key.fields[0][0] == "low_values"
+    assert pages[1].key.fields[0][2][-1] == 1
+    assert pages[1].value.fields[0][2][-1] == 1
+    assert pages[-1].token_count == 1
+    assert sum(page.token_count for page in pages) == cache.seen_tokens
+
+
 def test_huggingface_cache_adapter_reorders_without_losing_length():
     torch.manual_seed(6)
     config = DartKVCacheConfig(page_size=2, key_group_size=2, value_group_size=4, sink_tokens=0, metadata_dtype=torch.float32)

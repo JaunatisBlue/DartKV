@@ -15,6 +15,31 @@ Segment = Union[torch.Tensor, QuantizedTensor, MixedQuantizedKey]
 
 
 @dataclass(frozen=True)
+class DartSegmentLayout:
+    """Storage layout for one logical K/V segment.
+
+    ``fields`` lists the packed tensors and metadata in the order used by the
+    reference kernels.  Strides are element strides, not byte strides, so the
+    description can be passed directly to PyTorch or Triton indexing code.
+    """
+
+    kind: str
+    logical_shape: Tuple[int, ...]
+    fields: Tuple[Tuple[str, Tuple[int, ...], Tuple[int, ...]], ...]
+
+
+@dataclass(frozen=True)
+class DartPageMetadata:
+    """Sequence-order metadata for one page, sink segment, or pending buffer."""
+
+    index: int
+    sequence_start: int
+    token_count: int
+    key: DartSegmentLayout
+    value: DartSegmentLayout
+
+
+@dataclass(frozen=True)
 class DartKVCacheConfig:
     """Configuration for the reference cache.
 
@@ -179,10 +204,40 @@ class DartKVCache:
         without materializing the complete cache.
         """
 
+        if len(self._key_segments) != len(self._value_segments):
+            raise RuntimeError("DartKVCache key/value segment counts diverged")
         pairs = list(zip(self._key_segments, self._value_segments))
         if self._pending_key is not None:
+            if self._pending_value is None:
+                raise RuntimeError("DartKVCache has a pending key without a pending value")
             pairs.append((self._pending_key, self._pending_value))
         return pairs
+
+    def page_metadata(self) -> list[DartPageMetadata]:
+        """Describe page order, logical lengths, shapes, and element strides."""
+
+        metadata: list[DartPageMetadata] = []
+        sequence_start = 0
+        for index, (key_segment, value_segment) in enumerate(self.iter_segments()):
+            key_layout = _segment_layout(key_segment)
+            value_layout = _segment_layout(value_segment)
+            key_tokens = key_layout.logical_shape[-2]
+            value_tokens = value_layout.logical_shape[-2]
+            if key_tokens != value_tokens:
+                raise RuntimeError("DartKVCache key/value page lengths diverged")
+            metadata.append(DartPageMetadata(
+                index=index,
+                sequence_start=sequence_start,
+                token_count=key_tokens,
+                key=key_layout,
+                value=value_layout,
+            ))
+            sequence_start += key_tokens
+        if sequence_start != self._seen_tokens:
+            raise RuntimeError(
+                f"page metadata covers {sequence_start} tokens, expected {self._seen_tokens}"
+            )
+        return metadata
 
     def to(self, device: torch.device | str) -> "DartKVCache":
         """Move all backing tensors to ``device`` and return ``self``."""
@@ -241,33 +296,40 @@ class DartKVCache:
             self._quantize_pages(key_states[..., start:stop, :], value_states[..., start:stop, :])
 
     def _quantize_pages(self, key_states: torch.Tensor, value_states: torch.Tensor) -> None:
-        key_kwargs = {
-            "group_size": self.config.resolved_key_group_size,
-            "metadata_dtype": self.config.metadata_dtype,
-        }
-        if self.config.promote_ratio > 0.0:
-            key_segment: Segment = quantize_key_mixed(
-                key_states,
-                **key_kwargs,
-                promote_ratio=self.config.promote_ratio,
-                promote_bits=self.config.promote_bits,
-                strategy=self.config.channel_selection,
+        page_size = self.config.page_size
+        if key_states.shape[-2] != value_states.shape[-2]:
+            raise RuntimeError("key/value page lengths diverged before quantization")
+        for start in range(0, key_states.shape[-2], page_size):
+            stop = min(start + page_size, key_states.shape[-2])
+            key_page = key_states[..., start:stop, :]
+            value_page = value_states[..., start:stop, :]
+            key_kwargs = {
+                "group_size": self.config.resolved_key_group_size,
+                "metadata_dtype": self.config.metadata_dtype,
+            }
+            if self.config.promote_ratio > 0.0:
+                key_segment: Segment = quantize_key_mixed(
+                    key_page,
+                    **key_kwargs,
+                    promote_ratio=self.config.promote_ratio,
+                    promote_bits=self.config.promote_bits,
+                    strategy=self.config.channel_selection,
+                )
+            else:
+                key_segment = quantize_axis(
+                    key_page,
+                    axis=-2,
+                    bits=self.config.resolved_key_bits,
+                    **key_kwargs,
+                )
+            value_segment = quantize(
+                value_page,
+                bits=self.config.resolved_value_bits,
+                group_size=self.config.resolved_value_group_size,
+                metadata_dtype=self.config.metadata_dtype,
             )
-        else:
-            key_segment = quantize_axis(
-                key_states,
-                axis=-2,
-                bits=self.config.resolved_key_bits,
-                **key_kwargs,
-            )
-        value_segment = quantize(
-            value_states,
-            bits=self.config.resolved_value_bits,
-            group_size=self.config.resolved_value_group_size,
-            metadata_dtype=self.config.metadata_dtype,
-        )
-        self._key_segments.append(key_segment)
-        self._value_segments.append(value_segment)
+            self._key_segments.append(key_segment)
+            self._value_segments.append(value_segment)
 
 
 def _materialize(segment: Segment) -> torch.Tensor:
@@ -278,6 +340,33 @@ def _materialize_segments(segments: List[Segment]) -> List[torch.Tensor]:
     return [_materialize(segment) for segment in segments]
 
 
+def _segment_layout(segment: Segment) -> DartSegmentLayout:
+    if isinstance(segment, torch.Tensor):
+        fields = (("values", tuple(segment.shape), tuple(segment.stride())),)
+        return DartSegmentLayout("dense", tuple(segment.shape), fields)
+    if isinstance(segment, QuantizedTensor):
+        fields = tuple(
+            (name, tuple(tensor.shape), tuple(tensor.stride()))
+            for name, tensor in (
+                ("values", segment.values),
+                ("scale", segment.scale),
+                ("zero_point", segment.zero_point),
+            )
+        )
+        return DartSegmentLayout("quantized", segment.original_shape, fields)
+    fields = tuple(
+        (name, tuple(tensor.shape), tuple(tensor.stride()))
+        for name, tensor in (
+            ("low_values", segment.low_values),
+            ("high_values", segment.high_values),
+            ("channel_indices", segment.channel_indices),
+            ("scale", segment.scale),
+            ("zero_point", segment.zero_point),
+        )
+    )
+    return DartSegmentLayout("mixed_key", segment.original_shape, fields)
+
+
 def _segment_nbytes(segment: Segment) -> int:
     return segment.numel() * segment.element_size() if isinstance(segment, torch.Tensor) else segment.nbytes
 
@@ -286,4 +375,4 @@ def _segment_to(segment: Segment, device: torch.device | str) -> Segment:
     return segment.to(device) if isinstance(segment, QuantizedTensor) else segment.to(device)
 
 
-__all__ = ["DartKVCache", "DartKVCacheConfig"]
+__all__ = ["DartKVCache", "DartKVCacheConfig", "DartPageMetadata", "DartSegmentLayout"]

@@ -8,6 +8,7 @@ from typing import Optional
 import torch
 
 from .cache import DartKVCache
+from .triton_ops import triton_dequantize
 
 
 def dense_attention(
@@ -70,8 +71,8 @@ def streamed_dart_attention(
         running_sum = torch.zeros_like(running_max)
         running_value = torch.zeros((batch, query.shape[-2], head_dim), dtype=torch.float32, device=query.device)
         for key_segment, value_segment in cache.iter_segments():
-            keys = key_segment if isinstance(key_segment, torch.Tensor) else key_segment.dequantize()
-            values = value_segment if isinstance(value_segment, torch.Tensor) else value_segment.dequantize()
+            keys = key_segment if isinstance(key_segment, torch.Tensor) else triton_dequantize(key_segment)
+            values = value_segment if isinstance(value_segment, torch.Tensor) else triton_dequantize(value_segment)
             keys = keys[:, kv_head].float()
             values = values[:, kv_head].float()
             logits = torch.matmul(q, keys.transpose(-1, -2)) * factor
