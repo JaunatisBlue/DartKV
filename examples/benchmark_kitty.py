@@ -26,7 +26,12 @@ DEFAULT_PROMPT = None
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
-    parser.add_argument("--cache", choices=("dense", "dart", "kitty-reference"), default="dart")
+    parser.add_argument(
+        "--cache",
+        choices=("dense", "dart", "kitty-reference", "kitty-engine"),
+        default="dart",
+        help="kitty-engine uses the checked-in Triton/custom Qwen3 implementation",
+    )
     parser.add_argument(
         "--prompt",
         default=DEFAULT_PROMPT,
@@ -73,6 +78,28 @@ def _dense_storage(cache) -> int:
     return sum(tensor.numel() * tensor.element_size() for tensor in tensors)
 
 
+def _kitty_engine_storage(cache) -> int:
+    tensors = []
+    for layer in cache.kv_cache:
+        for name in (
+            "KeyCache",
+            "KeyCache_metadata",
+            "ValueCache",
+            "ValueCache_metadata",
+            "PageTable_K",
+            "PageTable_V",
+            "Sink_Buffer_K",
+            "Sink_Buffer_V",
+            "Q_Buffer_K",
+            "Q_Buffer_V",
+            "Local_Buffer_V",
+        ):
+            tensor = getattr(layer, name, None)
+            if tensor is not None:
+                tensors.append(tensor)
+    return sum(tensor.numel() * tensor.element_size() for tensor in tensors)
+
+
 def _new_cache(args: argparse.Namespace):
     if args.cache == "dense":
         from transformers import DynamicCache
@@ -93,6 +120,8 @@ def _new_cache(args: argparse.Namespace):
             promote_bit=4,
             channel_selection=1,
         ))
+    if args.cache == "kitty-engine":
+        raise RuntimeError("kitty-engine cache requires _new_engine_cache(model_config, args)")
     return DartHFCache(DartKVCacheConfig(
         bits=args.bits,
         key_bits=args.bits,
@@ -108,6 +137,15 @@ def _new_cache(args: argparse.Namespace):
         promote_ratio=args.promote_ratio,
         metadata_dtype=torch.float16,
     ))
+
+
+def _new_engine_cache(args: argparse.Namespace, model_config):
+    reference_src = Path(__file__).resolve().parents[1] / "reference" / "code" / "Kitty" / "src"
+    if str(reference_src) not in sys.path:
+        sys.path.insert(0, str(reference_src))
+    from kitty.kvcache import get_kvcache_kitty
+
+    return get_kvcache_kitty(model_config, args.batch_size, args.max_seq_len)
 
 
 def _kitty_prompt(choice: int) -> tuple[str, str]:
@@ -134,12 +172,29 @@ def main(argv: list[str] | None = None) -> int:
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=_dtype(args.dtype),
-        local_files_only=True,
-        attn_implementation=args.attn_implementation,
-    ).to(device).eval()
+    if args.cache == "kitty-engine":
+        reference_src = Path(__file__).resolve().parents[1] / "reference" / "code" / "Kitty" / "src"
+        if str(reference_src) not in sys.path:
+            sys.path.insert(0, str(reference_src))
+        from kitty.models.qwen3 import Qwen3ForCausalLM_Kitty
+        from transformers import AutoConfig
+
+        model_config = AutoConfig.from_pretrained(model_path, local_files_only=True)
+        model = Qwen3ForCausalLM_Kitty.from_pretrained(
+            model_path,
+            config=model_config,
+            torch_dtype=_dtype(args.dtype),
+            local_files_only=True,
+            attn_implementation="eager",
+        ).to(device).eval()
+    else:
+        model_config = None
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=_dtype(args.dtype),
+            local_files_only=True,
+            attn_implementation=args.attn_implementation,
+        ).to(device).eval()
     task_name, reference_prompt = _kitty_prompt(args.prompt_choice)
     prompt = args.prompt if args.prompt is not None else reference_prompt
     texts = [prompt] * args.batch_size
@@ -156,27 +211,41 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("max-seq-len must exceed the tokenized prompt length")
 
     def generate_once():
-        cache = _new_cache(args)
+        cache = _new_engine_cache(args, model_config) if args.cache == "kitty-engine" else _new_cache(args)
         with torch.inference_mode():
-            output = model.generate(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                max_length=args.max_seq_len,
-                max_new_tokens=None,
-                return_dict_in_generate=False,
-                do_sample=False,
-                temperature=None,
-                top_p=None,
-                top_k=None,
-                eos_token_id=None,
-                use_cache=True,
-                past_key_values=cache,
-            )
+            generate_kwargs = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "max_length": args.max_seq_len,
+                "max_new_tokens": None,
+                "return_dict_in_generate": False,
+                "do_sample": False,
+                "temperature": None,
+                "top_p": None,
+                "top_k": None,
+                "eos_token_id": None,
+                "use_cache": True,
+                "past_key_values": cache,
+            }
+            if args.cache == "kitty-engine":
+                generate_kwargs["disable_compile"] = True
+            output = model.generate(**generate_kwargs)
         _sync(device)
         if isinstance(cache, DartHFCache):
             storage_bytes = cache.storage_bytes
             dense_bytes = cache.dense_bytes
             ratio = cache.compression_ratio
+        elif args.cache == "kitty-engine":
+            storage_bytes = _kitty_engine_storage(cache)
+            dense_bytes = (
+                model.config.num_hidden_layers
+                * 2
+                * model.config.num_key_value_heads
+                * model.config.head_dim
+                * output.shape[-1]
+                * torch.tensor([], dtype=_dtype(args.dtype)).element_size()
+            )
+            ratio = dense_bytes / storage_bytes if storage_bytes else 1.0
         else:
             storage_bytes = _dense_storage(cache)
             dense_bytes = storage_bytes
@@ -229,6 +298,7 @@ def main(argv: list[str] | None = None) -> int:
         "records": records,
         "dart_config": vars(args) if args.cache == "dart" else None,
         "reference_simulation": args.cache == "kitty-reference",
+        "reference_engine": args.cache == "kitty-engine",
     }
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)

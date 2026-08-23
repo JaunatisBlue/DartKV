@@ -12,7 +12,7 @@ from pathlib import Path
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
-    parser.add_argument("--cache", choices=("dense", "dart", "kitty-reference"), default="dart")
+    parser.add_argument("--cache", choices=("dense", "dart", "kitty-reference", "kitty-engine"), default="dart")
     parser.add_argument("--batches", nargs="+", type=int, default=[1, 2, 4, 8, 16, 32, 64, 128, 256])
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", choices=("fp16", "bf16", "fp32"), default="fp16")
