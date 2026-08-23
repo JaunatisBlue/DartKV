@@ -10,3 +10,4 @@ ninja==1.13.0
 matplotlib==3.10.9
 seaborn==0.13.2
 hqq==0.2.8.post1
+optimum-quanto==0.2.7
