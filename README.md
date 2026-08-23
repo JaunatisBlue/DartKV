@@ -268,6 +268,16 @@ python examples/sweep_benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
   --cache kitty-engine --protocol paper --max-seq-len 8192 --device cuda:0
 ```
 
+For a bounded kernel/launch breakdown, profile a short decode window. The
+default writes only a compact aggregate table; add `--profile-trace` only when
+a potentially gigabyte-scale Chrome trace is needed:
+
+```bash
+python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
+  --cache kitty-engine --protocol paper --batch-size 8 --max-seq-len 256 \
+  --profile --device cuda:0
+```
+
 ## Reference provenance
 
 The design was informed by the Kitty artifact and the papers in

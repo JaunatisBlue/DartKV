@@ -76,6 +76,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--seed", type=int, default=20260823)
     parser.add_argument("--output", default="results/kitty_latency")
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Profile the first measured repeat and export a CUDA summary table",
+    )
+    parser.add_argument(
+        "--profile-trace",
+        action="store_true",
+        help="Also export a large Chrome trace (disabled by default)",
+    )
+    parser.add_argument("--profile-row-limit", type=int, default=40)
     return parser
 
 
@@ -300,10 +311,26 @@ def main(argv: list[str] | None = None) -> int:
         torch.cuda.reset_peak_memory_stats(device)
     timings = []
     records = []
-    for _ in range(args.repeat_runs):
-        start = time.perf_counter()
-        output, storage_bytes, dense_bytes, ratio = generate_once()
-        elapsed_ms = (time.perf_counter() - start) * 1000
+    profile = None
+    for repeat_index in range(args.repeat_runs):
+        if args.profile and repeat_index == 0:
+            activities = [torch.profiler.ProfilerActivity.CPU]
+            if device.type == "cuda":
+                activities.append(torch.profiler.ProfilerActivity.CUDA)
+            profile = torch.profiler.profile(
+                activities=activities,
+                record_shapes=False,
+                profile_memory=True,
+                with_stack=False,
+            )
+            profile.__enter__()
+        try:
+            start = time.perf_counter()
+            output, storage_bytes, dense_bytes, ratio = generate_once()
+            elapsed_ms = (time.perf_counter() - start) * 1000
+        finally:
+            if profile is not None and repeat_index == 0:
+                profile.__exit__(None, None, None)
         timings.append(elapsed_ms)
         records.append({
             "elapsed_ms": elapsed_ms,
@@ -349,8 +376,22 @@ def main(argv: list[str] | None = None) -> int:
     }
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
+    profile_trace = None
+    profile_table = None
+    output_stem = f"{model_path.name}_{args.cache}_{args.protocol}_b{args.batch_size}_l{args.max_seq_len}"
+    if profile is not None:
+        profile_table = output_dir / f"{output_stem}_profile.txt"
+        if args.profile_trace:
+            profile_trace = output_dir / f"{output_stem}_profile.json"
+            profile.export_chrome_trace(str(profile_trace))
+        sort_by = "self_cuda_time_total" if device.type == "cuda" else "self_cpu_time_total"
+        profile_table.write_text(
+            profile.key_averages().table(sort_by=sort_by, row_limit=args.profile_row_limit) + "\n"
+        )
+        result["profile_trace"] = str(profile_trace) if profile_trace is not None else None
+        result["profile_table"] = str(profile_table)
     output_path = output_dir / (
-        f"{model_path.name}_{args.cache}_{args.protocol}_b{args.batch_size}_l{args.max_seq_len}.json"
+        f"{output_stem}.json"
     )
     output_path.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({**result, "result_path": str(output_path)}, indent=2))
