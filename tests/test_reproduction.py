@@ -11,6 +11,7 @@ from examples.reproduce_kitty import (
     _stop_words,
     _summarize_repeats,
 )
+from examples.benchmark_kitty import _kitty_prompt
 from dart.mixed import quantize_key_mixed
 from dart.quantization import quantize
 from dart import DartKVCacheConfig
@@ -40,6 +41,13 @@ def test_stop_words_match_reference_runner_rules():
     assert qwen == ["<|endoftext|>", "<|im_end|>", "Given the following problem"]
     assert llama[-1] == "\n```"
     assert "<|eot_id|>" in llama
+
+
+def test_latency_prompt_is_the_kitty_reference_gsm8k_prompt():
+    task_name, prompt = _kitty_prompt(1)
+    assert task_name == "gsm8k"
+    assert "Janet" in prompt
+    assert "The final answer is [answer]" in prompt
 
 
 def test_repeat_summary_reports_maximum_deviation():
