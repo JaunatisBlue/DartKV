@@ -62,17 +62,56 @@
   },
   "curve_points": {
     "hf_dynamic_fp16": [
-      {"batch_size": 8, "sequence_tokens_per_second": 157.40987763300362},
+      {
+        "batch_size": 8,
+        "sequence_tokens_per_second": 157.40987763300362,
+        "generated_tokens_per_second": 155.48837033767887,
+        "peak_memory_allocated_bytes": 26197263872
+      },
       {
         "batch_size": 16,
         "sequence_tokens_per_second": 258.915571043695,
+        "generated_tokens_per_second": 255.75498057685306,
         "peak_memory_allocated_bytes": 36000343552,
         "peak_memory_reserved_bytes": 77315702784
       },
-      {"batch_size": 32, "sequence_tokens_per_second": 314.284684610062}
+      {
+        "batch_size": 32,
+        "sequence_tokens_per_second": 314.284684610062,
+        "generated_tokens_per_second": 310.44820164363057,
+        "peak_memory_allocated_bytes": 55609208320
+      }
+    ],
+    "hf_static_fp16": [
+      {
+        "batch_size": 32,
+        "sequence_tokens_per_second": 611.7807510091127,
+        "generated_tokens_per_second": 604.3127242633959,
+        "peak_memory_allocated_bytes": 55393537024,
+        "peak_memory_reserved_bytes": 55641636864
+      }
     ],
     "kitty_engine": [
-      {"batch_size": 8, "sequence_tokens_per_second": 144.2832296406856},
+      {
+        "batch_size": 8,
+        "sequence_tokens_per_second": 144.2832296406856,
+        "generated_tokens_per_second": 142.5219597476108,
+        "peak_memory_allocated_bytes": 18271364096
+      },
+      {
+        "batch_size": 32,
+        "sequence_tokens_per_second": 573.5382692839128,
+        "generated_tokens_per_second": 566.5370697076931,
+        "peak_memory_allocated_bytes": 23912270848,
+        "peak_memory_reserved_bytes": 24387780608
+      },
+      {
+        "batch_size": 64,
+        "sequence_tokens_per_second": 983.2272151738405,
+        "generated_tokens_per_second": 971.2249298323629,
+        "peak_memory_allocated_bytes": 31424830464,
+        "peak_memory_reserved_bytes": 31620857856
+      },
       {
         "batch_size": 128,
         "sequence_tokens_per_second": 1374.2499332866482,
@@ -80,7 +119,12 @@
         "peak_memory_allocated_bytes": 46457814528,
         "peak_memory_reserved_bytes": 47112519680
       },
-      {"batch_size": 256, "sequence_tokens_per_second": 1579.9303270954729}
+      {
+        "batch_size": 256,
+        "sequence_tokens_per_second": 1579.9303270954729,
+        "generated_tokens_per_second": 1560.6440682197956,
+        "peak_memory_allocated_bytes": 76519850496
+      }
     ]
   },
   "boundary_checks": {
