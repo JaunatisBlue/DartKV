@@ -232,6 +232,36 @@ def test_page_runs_stop_at_mixed_and_pending_tail_pages():
     assert table.uniform_quantized_runs(cache) == ()
 
 
+def test_local_tokens_preserve_kitty_style_fp16_suffix_until_next_page():
+    torch.manual_seed(57)
+    keys = torch.randn(1, 1, 13, 8)
+    cache = DartKVCache(DartKVCacheConfig(
+        page_size=4,
+        local_tokens=4,
+        key_group_size=4,
+        value_group_size=4,
+        metadata_dtype=torch.float32,
+    ))
+    cache.update(keys, keys)
+    pages = cache.page_metadata()
+    assert [(page.key.kind, page.token_count) for page in pages] == [
+        ("quantized", 4),
+        ("quantized", 4),
+        ("dense", 5),
+    ]
+    assert cache.page_table().key_modes.tolist() == [1, 1, 0]
+    cache.update(keys[..., :3, :], keys[..., :3, :])
+    pages = cache.page_metadata()
+    assert [(page.key.kind, page.token_count) for page in pages] == [
+        ("quantized", 4),
+        ("quantized", 4),
+        ("quantized", 4),
+        ("dense", 4),
+    ]
+    restored, _ = cache.get()
+    assert restored.shape[-2] == 16
+
+
 def test_huggingface_cache_adapter_reorders_without_losing_length():
     torch.manual_seed(6)
     config = DartKVCacheConfig(page_size=2, key_group_size=2, value_group_size=4, sink_tokens=0, metadata_dtype=torch.float32)

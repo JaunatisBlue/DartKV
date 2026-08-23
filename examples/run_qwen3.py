@@ -34,6 +34,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sink-tokens", type=int, default=32)
     parser.add_argument("--page-size", type=int, default=128)
     parser.add_argument("--hold-partial-pages", action="store_true")
+    parser.add_argument(
+        "--local-tokens",
+        type=int,
+        default=0,
+        help="Keep this many newest tokens in dense storage, matching Kitty's Local/Q buffer",
+    )
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", choices=("bf16", "fp16", "fp32"), default="bf16")
     parser.add_argument("--attn-implementation", choices=("eager", "sdpa"), default="eager")
@@ -72,6 +78,7 @@ def _make_cache(args: argparse.Namespace):
             sink_tokens=args.sink_tokens,
             page_size=args.page_size,
             hold_partial_pages=args.hold_partial_pages,
+            local_tokens=args.local_tokens,
             promote_bits=args.promote_bits,
             promote_ratio=args.promote_ratio,
             channel_selection=args.channel_selection,

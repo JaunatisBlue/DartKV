@@ -134,3 +134,18 @@ packed metadata 访问、单 query-head program 和尚未融合的物理 page ta
 不变量检查，应该在 cache append/reorder 后缓存；不能把它放入每 token decode 的
 kernel latency。当前 fused wrapper 已接受预构建的 `page_table=` 参数，下一步
 会把 descriptor tensor 直接传入 page-run kernel。
+
+## Kitty accuracy reproduction entrypoint
+
+论文第 5 节的准确率实验要求同一模型、task、few-shot、seed 下比较 K16V16、
+KIVI-K2V2、KIVI-K2V2*、Kitty 和 Kitty-Pro。DartKV 新增
+`examples/reproduce_kitty.py`，使用本地 `lm-eval` task，并将
+`local_tokens=buffer_length=128` 映射为 Kitty 的 dense Q/Local buffer；变体配置
+分别是 sink `0/32`、key/value 2-bit 和 key promotion `0/12.5%/25%`。首次建议
+用 `--limit 1` 验证模型、task 和 cache 生命周期，再去掉 limit 运行完整数据集。
+
+在本地 Qwen3-0.6B smoke（FP16、seed `20260823`、sink=2、buffer/page=8、
+promotion=25%、生成 4 tokens）中，Kitty reference cache 与 DartHFCache 生成的
+token ID 序列完全一致；这验证了 local suffix、quantization page 边界和
+Transformers generation adapter 的基本对齐。该 smoke 不是论文 Table 3 的
+8B accuracy 结果，完整结果仍需对应的 8B/任务数据与论文重复次数。

@@ -113,3 +113,8 @@ sink、mixed key 和 pending tail 会终止 run，继续走逐页 kernel。传�
 描述；`reorder_cache(beam_idx)` 会重建被选 beam 的 layer cache，因此旧 table/run
 不会继续复用。若要强制刷新当前逻辑 layout，可传 `rebuild=True`，但正常 decode
 路径不需要这样做。
+
+当需要复现 Kitty 的 accuracy simulation 时，将 `local_tokens` 设为
+`buffer_length`。这样 prefill/decode 会持续保留最新 dense Q/Local suffix，只有
+更早的完整 page 才进入 packed quantized storage；`local_tokens=0` 则保留 DartKV
+原本的“只保留不足一页 pending”参考行为。

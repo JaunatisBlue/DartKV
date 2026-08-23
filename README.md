@@ -150,6 +150,25 @@ The returned page runs are consumed by the single-token fused attention
 reference; mixed, sink, and pending boundary pages continue through the
 per-page path.
 
+## Kitty paper reproduction
+
+The local reproduction runner mirrors Kitty's accuracy matrix (`K16V16`,
+`KIVI-K2V2`, `KIVI-K2V2*`, `Kitty`, and `Kitty-Pro`) through the installed
+`lm-eval` tasks. It uses `local_tokens=buffer_length` so the newest Q/Local
+buffer remains dense, matching Kitty's simulation lifecycle:
+
+```bash
+python examples/reproduce_kitty.py \
+  --model /opt/model/Qwen/Qwen3-8B \
+  --task gsm8k_cot_llama --variant kitty-pro \
+  --device cuda:0 --dtype fp16 --repeats 3 --max-new-tokens 4096
+```
+
+Use `--limit 1` for a smoke run. Results and per-repeat samples are written
+under `results/kitty_repro/`; the command records the model, task, seed, cache
+configuration, PyTorch version, and device so a full paper-scale run can be
+audited separately from a smoke result.
+
 ## Reference provenance
 
 The design was informed by the Kitty artifact and the papers in

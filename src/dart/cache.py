@@ -61,6 +61,7 @@ class DartKVCacheConfig:
     value_group_size: Optional[int] = None
     page_size: int = 128
     hold_partial_pages: bool = False
+    local_tokens: int = 0
     promote_bits: int = 4
     promote_ratio: float = 0.0
     channel_selection: str = "magnitude"
@@ -80,6 +81,8 @@ class DartKVCacheConfig:
                 raise ValueError(f"{name} must be a positive integer")
         if self.page_size <= 0:
             raise ValueError("page_size must be positive")
+        if not isinstance(self.local_tokens, int) or self.local_tokens < 0:
+            raise ValueError("local_tokens must be a non-negative integer")
         if self.promote_bits != 4:
             raise ValueError("the reference mixed representation currently supports promote_bits=4")
         if not 0.0 <= self.promote_ratio <= 1.0:
@@ -355,11 +358,13 @@ class DartKVCache:
             raise ValueError("all updates must keep batch/head/head_dim, dtype, and device unchanged")
 
     def _append_remainder(self, key_states: torch.Tensor, value_states: torch.Tensor) -> None:
-        if self.config.hold_partial_pages:
+        if self.config.hold_partial_pages or self.config.local_tokens:
             if self._pending_key is not None:
                 key_states = torch.cat((self._pending_key, key_states), dim=-2)
                 value_states = torch.cat((self._pending_value, value_states), dim=-2)
-            full_tokens = (key_states.shape[-2] // self.config.page_size) * self.config.page_size
+            available_tokens = key_states.shape[-2] - self.config.local_tokens
+            available_tokens = max(0, available_tokens)
+            full_tokens = (available_tokens // self.config.page_size) * self.config.page_size
             if full_tokens:
                 self._quantize_pages(key_states[..., :full_tokens, :], value_states[..., :full_tokens, :])
             self._pending_key = key_states[..., full_tokens:, :].clone() if full_tokens < key_states.shape[-2] else None
