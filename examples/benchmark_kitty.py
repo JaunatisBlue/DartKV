@@ -56,7 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--value-group-size", type=int, default=128)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", choices=("fp16", "bf16", "fp32"), default="fp16")
-    parser.add_argument("--attn-implementation", choices=("eager", "sdpa"), default="sdpa")
+    parser.add_argument(
+        "--attn-implementation",
+        choices=("eager", "sdpa", "flash_attention_2"),
+        default="sdpa",
+        help="Transformers attention backend for dense/reference caches; kitty-engine keeps its Triton path",
+    )
     parser.add_argument("--seed", type=int, default=20260823)
     parser.add_argument("--output", default="results/kitty_latency")
     return parser

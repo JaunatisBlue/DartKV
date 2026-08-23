@@ -37,6 +37,35 @@ The standard-task smoke evaluator is optional and can be installed with
 `python -m pip install -r requirements-eval.txt`; it is not needed for the
 PyTorch cache or Qwen generation runner.
 
+For the Kitty paper/system path, install the checked-in Kitty package and its
+optional evaluation tools:
+
+```bash
+python -m pip install -e reference/code/Kitty --no-deps
+python -m pip install matplotlib seaborn hqq
+```
+
+The paper used FlashAttention 2.7.4.post1.  It is a CUDA extension rather than
+a portable wheel, so on an A100 build only the required `sm80` kernel (the
+same command was used for the verified environment):
+
+```bash
+CUDA_HOME=/usr/local/cuda \
+FLASH_ATTN_CUDA_ARCHS=80 \
+MAX_JOBS=4 \
+python -m pip install --no-build-isolation flash-attn==2.7.4.post1
+```
+
+Verify both the extension and the Transformers integration before a long run:
+
+```bash
+python -c 'import flash_attn, torch; print(flash_attn.__version__, torch.cuda.get_device_name())'
+```
+
+The latency benchmark accepts `--attn-implementation flash_attention_2` for
+dense/standard-cache comparisons.  `kitty-engine` intentionally uses Kitty's
+own Triton attention kernel and is unaffected by that flag.
+
 If the environment is missing, create it first with `conda create -n dartkv
 python=3.10 -y`. Do not install the project into `base`. Verify the hardware
 and PyTorch runtime before running GPU work:
@@ -208,6 +237,10 @@ cache, for a direct semantic baseline:
 python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
   --cache dart --batch-size 32 --max-seq-len 8192 \
   --warmup-runs 2 --repeat-runs 3 --device cuda:0
+
+python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
+  --cache dense --attn-implementation flash_attention_2 \
+  --batch-size 1 --max-seq-len 8192 --device cuda:0
 ```
 
 The default is Kitty's `prompt_choice=1` (the GSM8K few-shot prompt, roughly

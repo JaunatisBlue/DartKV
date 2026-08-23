@@ -1,3 +1,12 @@
 # Optional standard-task evaluation stack; the core reference path does not
 # need this dependency set.
 lm-eval==0.4.12
+
+# Kitty artifact and paper-system evaluation tools.  flash-attn is compiled
+# for the local GPU; see README.md for the CUDA_ARCHS build command.
+flash-attn==2.7.4.post1
+einops==0.8.2
+ninja==1.13.0
+matplotlib==3.10.9
+seaborn==0.13.2
+hqq==0.2.8.post1
