@@ -1,0 +1,6 @@
+# Verified in the dartkv conda environment on 2026-08-23.
+# The PyTorch wheel supplies the CUDA runtime used by the reference path;
+# the host NVIDIA driver must still be compatible with that runtime.
+torch==2.7.1
+numpy==2.2.6
+pytest==8.4.1
