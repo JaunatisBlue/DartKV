@@ -251,10 +251,22 @@ distinction is recorded in every result; use `--no-chat-template` only for an
 explicitly different protocol.
 
 The benchmark reports both complete-sequence and newly-generated tokens/s,
-peak memory, storage ratio, and a prefix of generated token IDs. The historical
-`tokens_per_second` field aliases complete-sequence throughput, the Figure 5
-metric. `kitty-reference` is the simulation cache and does not claim the custom
-Kitty Triton engine's throughput.
+peak allocated/reserved memory, storage ratio, and a prefix of generated token
+IDs. The historical `tokens_per_second` field aliases complete-sequence
+throughput, the Figure 5 metric. `kitty-reference` is the simulation cache and
+does not claim the custom Kitty Triton engine's throughput.
+
+The first complete A100 endpoint check (one warmup and one measured run) found
+the following maximum successful batches. The Kitty endpoint provides the
+paper's 8x batch-size gain and reaches 5.03x the local HF Dynamic FP16
+throughput, meeting rather than falling short of the paper's reported 2.1x--4.1x
+range. Exact commands, package versions, storage, and timing values are tracked
+in `experiments/kitty_figure5_reproduction.json`.
+
+| cache | maximum batch | sequence tokens/s | generated tokens/s |
+| --- | ---: | ---: | ---: |
+| HF Dynamic FP16 + FlashAttention 2 | 32 | 314.28 | 310.45 |
+| Kitty engine + FlashAttention 2 prefill | 256 | 1579.93 | 1560.64 |
 
 To reproduce Figure 5's increasing-batch protocol, run the subprocess-isolated
 sweep (an OOM batch is recorded and terminates the sweep cleanly):

@@ -276,9 +276,10 @@ def main(argv: list[str] | None = None) -> int:
                 "eos_token_id": None,
                 "use_cache": True,
                 "past_key_values": cache,
+                # Kitty's checked-in latency script disables generation-time
+                # torch.compile for every cache implementation.
+                "disable_compile": True,
             }
-            if args.cache == "kitty-engine":
-                generate_kwargs["disable_compile"] = True
             output = model.generate(**generate_kwargs)
         _sync(device)
         if isinstance(cache, DartHFCache):
@@ -341,6 +342,7 @@ def main(argv: list[str] | None = None) -> int:
             "first_output_token_ids": output[0, : min(32, output.shape[-1])].tolist(),
         })
     peak_memory = torch.cuda.max_memory_allocated(device) if device.type == "cuda" else None
+    peak_memory_reserved = torch.cuda.max_memory_reserved(device) if device.type == "cuda" else None
     avg_ms = sum(timings) / len(timings)
     generated_tokens = args.batch_size * (args.max_seq_len - input_ids.shape[-1])
     sequence_tokens = args.batch_size * args.max_seq_len
@@ -369,6 +371,7 @@ def main(argv: list[str] | None = None) -> int:
         "sequence_tokens_per_second": sequence_tokens / elapsed_seconds,
         "generated_tokens_per_second": generated_tokens / elapsed_seconds,
         "peak_memory_bytes": peak_memory,
+        "peak_memory_reserved_bytes": peak_memory_reserved,
         "records": records,
         "dart_config": vars(args) if args.cache == "dart" else None,
         "reference_simulation": args.cache == "kitty-reference",
