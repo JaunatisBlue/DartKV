@@ -73,6 +73,13 @@
     ],
     "kitty_engine": [
       {"batch_size": 8, "sequence_tokens_per_second": 144.2832296406856},
+      {
+        "batch_size": 128,
+        "sequence_tokens_per_second": 1374.2499332866482,
+        "generated_tokens_per_second": 1357.4744214057077,
+        "peak_memory_allocated_bytes": 46457814528,
+        "peak_memory_reserved_bytes": 47112519680
+      },
       {"batch_size": 256, "sequence_tokens_per_second": 1579.9303270954729}
     ]
   },

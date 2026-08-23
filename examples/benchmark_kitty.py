@@ -378,12 +378,17 @@ def main(argv: list[str] | None = None) -> int:
     for _ in range(args.warmup_runs):
         generate_once()
     _sync(device)
+    print(f"[benchmark] completed {args.warmup_runs} warmup run(s)", flush=True)
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
     timings = []
     records = []
     profile = None
     for repeat_index in range(args.repeat_runs):
+        print(
+            f"[benchmark] measured repeat {repeat_index + 1}/{args.repeat_runs}",
+            flush=True,
+        )
         if args.profile and repeat_index == 0:
             activities = [torch.profiler.ProfilerActivity.CPU]
             if device.type == "cuda":
