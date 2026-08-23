@@ -239,6 +239,13 @@ class DartKVCache:
             )
         return metadata
 
+    def page_table(self, *, device: torch.device | str | None = None):
+        """Build device-resident page descriptors for the current segments."""
+
+        from .page_table import DartPageTable
+
+        return DartPageTable.from_cache(self, device=device)
+
     def to(self, device: torch.device | str) -> "DartKVCache":
         """Move all backing tensors to ``device`` and return ``self``."""
 

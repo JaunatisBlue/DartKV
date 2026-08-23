@@ -99,6 +99,41 @@ def test_page_metadata_freezes_sequence_order_and_storage_strides():
     assert sum(page.token_count for page in pages) == cache.seen_tokens
 
 
+def test_page_table_tracks_kitty_style_ids_modes_and_reorder():
+    torch.manual_seed(52)
+    keys = torch.randn(2, 2, 11, 12)
+    values = torch.randn_like(keys)
+    cache = DartKVCache(DartKVCacheConfig(
+        page_size=4,
+        hold_partial_pages=True,
+        sink_tokens=2,
+        key_group_size=4,
+        value_group_size=6,
+        promote_ratio=0.25,
+        metadata_dtype=torch.float32,
+    ))
+    cache.update(keys, values)
+    table = cache.page_table().validate()
+    assert table.page_ids.shape == (2, 4)
+    assert table.page_ids.tolist() == [[0, 1, 2, 3], [0, 1, 2, 3]]
+    assert table.sequence_ranges().tolist() == [[0, 2], [2, 6], [6, 10], [10, 11]]
+    assert table.key_modes.tolist() == [0, 2, 2, 0]
+    assert table.value_modes.tolist() == [0, 1, 1, 0]
+    assert table.reorder(torch.tensor([1, 1])).page_ids.tolist() == [[0, 1, 2, 3], [0, 1, 2, 3]]
+    assert table.to("cpu").device.type == "cpu"
+
+
+def test_empty_page_table_is_valid_and_append_refreshes_metadata():
+    cache = DartKVCache(DartKVCacheConfig(page_size=4))
+    empty = cache.page_table().validate()
+    assert empty.page_ids.shape == (0, 0)
+    key = torch.randn(1, 1, 5, 8)
+    cache.update(key, key)
+    table = cache.page_table().validate()
+    assert table.page_count == 2
+    assert table.seen_tokens == 5
+
+
 def test_huggingface_cache_adapter_reorders_without_losing_length():
     torch.manual_seed(6)
     config = DartKVCacheConfig(page_size=2, key_group_size=2, value_group_size=4, sink_tokens=0, metadata_dtype=torch.float32)
@@ -123,3 +158,6 @@ def test_cache_runs_on_gpu():
     cache.to("cpu")
     restored_cpu, _ = cache.get()
     assert restored_cpu.device.type == "cpu"
+    table = cache.page_table().validate()
+    assert table.device.type == "cpu"
+    assert table.page_count == 1

@@ -16,6 +16,7 @@ import torch
 from .attention import streamed_dart_attention
 from .cache import DartKVCache
 from .mixed import MixedQuantizedKey
+from .page_table import DartPageTable
 from .quantization import QuantizedTensor
 from .triton_ops import TRITON_AVAILABLE, triton
 
@@ -435,6 +436,7 @@ def fused_dart_attention(
     *,
     scale: Optional[float] = None,
     fallback: bool = True,
+    page_table: Optional[DartPageTable] = None,
 ) -> torch.Tensor:
     """Run single-token page attention with fused Triton page updates.
 
@@ -464,10 +466,18 @@ def fused_dart_attention(
     if query.shape[1] % kv_heads:
         raise ValueError("query heads must be divisible by cache KV heads")
     factor = scale if scale is not None else 1.0 / math.sqrt(head_dim)
+    segments = cache.iter_segments()
+    table = page_table or cache.page_table(device=query.device)
+    if table.device != query.device:
+        table = table.to(query.device)
+    if table.page_count != len(segments) or table.seen_tokens != cache.seen_tokens:
+        raise ValueError("page_table does not describe the current cache segments")
     running_max = torch.full((batch, query.shape[1]), -torch.inf, dtype=torch.float32, device=query.device)
     running_sum = torch.zeros_like(running_max)
     running_output = torch.zeros((batch, query.shape[1], head_dim), dtype=torch.float32, device=query.device)
-    for key_segment, value_segment in cache.iter_segments():
+    for page_index, (key_segment, value_segment) in enumerate(segments):
+        if int(table.token_counts[page_index].item()) != _segment_tokens(key_segment):
+            raise ValueError(f"page_table token count mismatch at page {page_index}")
         _launch_fused_page(
             query,
             key_segment,
@@ -478,6 +488,10 @@ def fused_dart_attention(
             scale=factor,
         )
     return (running_output / running_sum.clamp_min(1e-20).unsqueeze(-1)).unsqueeze(2).to(query.dtype)
+
+
+def _segment_tokens(segment: torch.Tensor | QuantizedTensor | MixedQuantizedKey) -> int:
+    return segment.shape[-2] if isinstance(segment, torch.Tensor) else segment.original_shape[-2]
 
 
 __all__ = ["fused_dart_attention"]
