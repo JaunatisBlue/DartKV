@@ -134,6 +134,50 @@ def test_empty_page_table_is_valid_and_append_refreshes_metadata():
     assert table.seen_tokens == 5
 
 
+def test_page_table_stacks_consecutive_uniform_pages_page_major():
+    torch.manual_seed(53)
+    keys = torch.randn(1, 2, 13, 16)
+    values = torch.randn_like(keys)
+    cache = DartKVCache(DartKVCacheConfig(
+        page_size=4,
+        hold_partial_pages=True,
+        sink_tokens=1,
+        key_group_size=4,
+        value_group_size=8,
+        metadata_dtype=torch.float32,
+    ))
+    cache.update(keys, values)
+    table = cache.page_table().validate()
+    runs = table.uniform_quantized_runs(cache)
+    assert len(runs) == 1
+    run = runs[0].validate()
+    assert run.first_page_index == 1
+    assert run.page_indices.tolist() == [1, 2, 3]
+    assert run.sequence_starts.tolist() == [1, 5, 9]
+    assert run.token_counts.tolist() == [4, 4, 4]
+    assert run.key_values.shape[:4] == (3, 1, 2, 16)
+    assert run.value_values.shape[:4] == (3, 1, 2, 4)
+    assert run.key_scale.shape[0] == run.value_scale.shape[0] == 3
+
+
+def test_page_runs_stop_at_mixed_and_pending_tail_pages():
+    torch.manual_seed(54)
+    keys = torch.randn(1, 1, 10, 8)
+    cache = DartKVCache(DartKVCacheConfig(
+        page_size=4,
+        hold_partial_pages=True,
+        promote_ratio=0.25,
+        key_group_size=4,
+        value_group_size=4,
+        metadata_dtype=torch.float32,
+    ))
+    cache.update(keys, keys)
+    table = cache.page_table().validate()
+    assert table.key_modes.tolist() == [2, 2, 0]
+    assert table.value_modes.tolist() == [1, 1, 0]
+    assert table.uniform_quantized_runs(cache) == ()
+
+
 def test_huggingface_cache_adapter_reorders_without_losing_length():
     torch.manual_seed(6)
     config = DartKVCacheConfig(page_size=2, key_group_size=2, value_group_size=4, sink_tokens=0, metadata_dtype=torch.float32)

@@ -9,14 +9,14 @@ semantics visible while removing full-page dequantized temporaries.
 from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import Optional, Sequence
 
 import torch
 
 from .attention import streamed_dart_attention
 from .cache import DartKVCache
 from .mixed import MixedQuantizedKey
-from .page_table import DartPageTable
+from .page_table import DartPageRun, DartPageTable
 from .quantization import QuantizedTensor
 from .triton_ops import TRITON_AVAILABLE, triton
 
@@ -271,6 +271,164 @@ if TRITON_AVAILABLE:
             mask=channel_mask,
         )
 
+    @triton.jit
+    def _fused_uniform_page_run_kernel(
+        query_ptr,
+        query_stride_b,
+        query_stride_h,
+        query_stride_d,
+        key_values_ptr,
+        key_values_stride_n,
+        key_values_stride_b,
+        key_values_stride_h,
+        key_values_stride_d,
+        key_values_stride_p,
+        key_scale_ptr,
+        key_scale_stride_n,
+        key_scale_stride_b,
+        key_scale_stride_h,
+        key_scale_stride_d,
+        key_scale_stride_g,
+        key_zero_ptr,
+        value_values_ptr,
+        value_values_stride_n,
+        value_values_stride_b,
+        value_values_stride_h,
+        value_values_stride_t,
+        value_values_stride_p,
+        value_scale_ptr,
+        value_scale_stride_n,
+        value_scale_stride_b,
+        value_scale_stride_h,
+        value_scale_stride_t,
+        value_scale_stride_g,
+        value_zero_ptr,
+        max_ptr,
+        max_stride_b,
+        max_stride_h,
+        sum_ptr,
+        sum_stride_b,
+        sum_stride_h,
+        output_ptr,
+        output_stride_b,
+        output_stride_h,
+        output_stride_d,
+        page_count,
+        page_tokens,
+        head_dim,
+        query_heads,
+        kv_heads,
+        key_group_size,
+        value_group_size,
+        scale,
+        KEY_BITS: tl.constexpr,
+        KEY_VALUES_PER_BYTE: tl.constexpr,
+        VALUE_BITS: tl.constexpr,
+        VALUE_VALUES_PER_BYTE: tl.constexpr,
+        BLOCK_T: tl.constexpr,
+        BLOCK_D: tl.constexpr,
+    ):
+        """Walk one page-major uniform run per ``(batch, query_head)`` program."""
+
+        pid = tl.program_id(0)
+        batch_index = pid // query_heads
+        query_head = pid % query_heads
+        group = query_heads // kv_heads
+        kv_head = query_head // group
+        token_offsets = tl.arange(0, BLOCK_T)
+        channel_offsets = tl.arange(0, BLOCK_D)
+        token_mask = token_offsets < page_tokens
+        channel_mask = channel_offsets < head_dim
+        matrix_mask = token_mask[:, None] & channel_mask[None, :]
+        q = tl.load(
+            query_ptr
+            + batch_index * query_stride_b
+            + query_head * query_stride_h
+            + channel_offsets * query_stride_d,
+            mask=channel_mask,
+            other=0.0,
+        ).to(tl.float32)
+        old_max = tl.load(max_ptr + batch_index * max_stride_b + query_head * max_stride_h)
+        old_sum = tl.load(sum_ptr + batch_index * sum_stride_b + query_head * sum_stride_h)
+        old_output = tl.load(
+            output_ptr
+            + batch_index * output_stride_b
+            + query_head * output_stride_h
+            + channel_offsets * output_stride_d,
+            mask=channel_mask,
+            other=0.0,
+        ).to(tl.float32)
+
+        for page_index in tl.range(0, page_count):
+            key_group = token_offsets // key_group_size
+            key_packed = token_offsets // KEY_VALUES_PER_BYTE
+            key_shift = (token_offsets % KEY_VALUES_PER_BYTE) * KEY_BITS
+            key_offset = (
+                page_index * key_values_stride_n
+                + batch_index * key_values_stride_b
+                + kv_head * key_values_stride_h
+                + channel_offsets[None, :] * key_values_stride_d
+                + key_packed[:, None] * key_values_stride_p
+            )
+            key_q = tl.load(key_values_ptr + key_offset, mask=matrix_mask, other=0).to(tl.int32)
+            key_q = (key_q >> key_shift[:, None]) & ((1 << KEY_BITS) - 1)
+            key_meta_offset = (
+                page_index * key_scale_stride_n
+                + batch_index * key_scale_stride_b
+                + kv_head * key_scale_stride_h
+                + channel_offsets[None, :] * key_scale_stride_d
+                + key_group[:, None] * key_scale_stride_g
+            )
+            key_scale_value = tl.load(key_scale_ptr + key_meta_offset, mask=matrix_mask, other=1.0).to(tl.float32)
+            key_zero_value = tl.load(key_zero_ptr + key_meta_offset, mask=matrix_mask, other=0.0).to(tl.float32)
+            key = key_q.to(tl.float32) * key_scale_value + key_zero_value
+
+            value_packed = channel_offsets // VALUE_VALUES_PER_BYTE
+            value_shift = (channel_offsets % VALUE_VALUES_PER_BYTE) * VALUE_BITS
+            value_offset = (
+                page_index * value_values_stride_n
+                + batch_index * value_values_stride_b
+                + kv_head * value_values_stride_h
+                + token_offsets[:, None] * value_values_stride_t
+                + value_packed[None, :] * value_values_stride_p
+            )
+            value_q = tl.load(value_values_ptr + value_offset, mask=matrix_mask, other=0).to(tl.int32)
+            value_q = (value_q >> value_shift[None, :]) & ((1 << VALUE_BITS) - 1)
+            value_group = channel_offsets // value_group_size
+            value_meta_offset = (
+                page_index * value_scale_stride_n
+                + batch_index * value_scale_stride_b
+                + kv_head * value_scale_stride_h
+                + token_offsets[:, None] * value_scale_stride_t
+                + value_group[None, :] * value_scale_stride_g
+            )
+            value_scale_value = tl.load(value_scale_ptr + value_meta_offset, mask=matrix_mask, other=1.0).to(tl.float32)
+            value_zero_value = tl.load(value_zero_ptr + value_meta_offset, mask=matrix_mask, other=0.0).to(tl.float32)
+            value = value_q.to(tl.float32) * value_scale_value + value_zero_value
+
+            logits = tl.sum(q[None, :] * key, axis=1) * scale
+            logits = tl.where(token_mask, logits, float("-inf"))
+            page_max = tl.max(logits, axis=0)
+            new_max = tl.maximum(old_max, page_max)
+            old_weight = tl.exp(old_max - new_max)
+            weights = tl.exp(logits - new_max)
+            weights = tl.where(token_mask, weights, 0.0)
+            page_output = tl.sum(weights[:, None] * value, axis=0)
+            old_output = old_output * old_weight + page_output
+            old_sum = old_sum * old_weight + tl.sum(weights, axis=0)
+            old_max = new_max
+
+        tl.store(max_ptr + batch_index * max_stride_b + query_head * max_stride_h, old_max)
+        tl.store(sum_ptr + batch_index * sum_stride_b + query_head * sum_stride_h, old_sum)
+        tl.store(
+            output_ptr
+            + batch_index * output_stride_b
+            + query_head * output_stride_h
+            + channel_offsets * output_stride_d,
+            old_output,
+            mask=channel_mask,
+        )
+
 
 def _next_power_of_two(value: int) -> int:
     return 1 if value <= 1 else 1 << (value - 1).bit_length()
@@ -430,6 +588,69 @@ def _launch_fused_page(
     )
 
 
+def _launch_fused_uniform_page_run(
+    query: torch.Tensor,
+    run: DartPageRun,
+    running_max: torch.Tensor,
+    running_sum: torch.Tensor,
+    running_output: torch.Tensor,
+    *,
+    scale: float,
+) -> None:
+    """Launch one Triton program per query head for a stacked page run."""
+
+    if run.device != query.device:
+        run = run.to(query.device)
+    run.validate()
+    batch, query_heads, _, head_dim = query.shape
+    page_tokens = int(run.token_counts[0].item())
+    if bool((run.token_counts != page_tokens).any().item()):
+        raise ValueError("uniform page run requires equal token counts")
+    block_t = _next_power_of_two(page_tokens)
+    block_d = _next_power_of_two(head_dim)
+    grid = (batch * query_heads,)
+    _fused_uniform_page_run_kernel[grid](
+        query,
+        query.stride(0),
+        query.stride(1),
+        query.stride(3),
+        run.key_values,
+        *_strides(run.key_values, 5),
+        run.key_scale,
+        *_strides(run.key_scale, 5),
+        run.key_zero_point,
+        run.value_values,
+        *_strides(run.value_values, 5),
+        run.value_scale,
+        *_strides(run.value_scale, 5),
+        run.value_zero_point,
+        running_max,
+        running_max.stride(0),
+        running_max.stride(1),
+        running_sum,
+        running_sum.stride(0),
+        running_sum.stride(1),
+        running_output,
+        running_output.stride(0),
+        running_output.stride(1),
+        running_output.stride(2),
+        run.page_count,
+        page_tokens,
+        head_dim,
+        query_heads,
+        run.key_values.shape[2],
+        run.key_group_size,
+        run.value_group_size,
+        scale,
+        KEY_BITS=run.key_bits,
+        KEY_VALUES_PER_BYTE=8 // run.key_bits,
+        VALUE_BITS=run.value_bits,
+        VALUE_VALUES_PER_BYTE=8 // run.value_bits,
+        BLOCK_T=block_t,
+        BLOCK_D=block_d,
+    )
+
+
 def fused_dart_attention(
     query: torch.Tensor,
     cache: DartKVCache,
@@ -437,6 +658,7 @@ def fused_dart_attention(
     scale: Optional[float] = None,
     fallback: bool = True,
     page_table: Optional[DartPageTable] = None,
+    page_runs: Optional[Sequence[DartPageRun]] = None,
 ) -> torch.Tensor:
     """Run single-token page attention with fused Triton page updates.
 
@@ -472,10 +694,41 @@ def fused_dart_attention(
         table = table.to(query.device)
     if table.page_count != len(segments) or table.seen_tokens != cache.seen_tokens:
         raise ValueError("page_table does not describe the current cache segments")
+    runs = tuple(table.uniform_quantized_runs(cache)) if page_runs is None else tuple(page_runs)
+    run_by_start: dict[int, DartPageRun] = {}
+    for run in runs:
+        run.validate()
+        if run.first_page_index in run_by_start:
+            raise ValueError("page_runs contain duplicate first_page_index")
+        stop = run.first_page_index + run.page_count
+        if run.first_page_index < 0 or stop > len(segments):
+            raise ValueError("page_run is outside the current cache page range")
+        expected_ids = table.page_ids[0, run.first_page_index:stop].to(run.page_indices.device)
+        if not torch.equal(expected_ids, run.page_indices):
+            raise ValueError("page_run logical IDs do not match page_table")
+        if bool((table.key_modes[run.first_page_index:stop] != 1).any().item()) or bool(
+            (table.value_modes[run.first_page_index:stop] != 1).any().item()
+        ):
+            raise ValueError("page_runs may only contain uniform quantized pages")
+        run_by_start[run.first_page_index] = run
     running_max = torch.full((batch, query.shape[1]), -torch.inf, dtype=torch.float32, device=query.device)
     running_sum = torch.zeros_like(running_max)
     running_output = torch.zeros((batch, query.shape[1], head_dim), dtype=torch.float32, device=query.device)
-    for page_index, (key_segment, value_segment) in enumerate(segments):
+    page_index = 0
+    while page_index < len(segments):
+        run = run_by_start.get(page_index)
+        if run is not None:
+            _launch_fused_uniform_page_run(
+                query,
+                run,
+                running_max,
+                running_sum,
+                running_output,
+                scale=factor,
+            )
+            page_index += run.page_count
+            continue
+        key_segment, value_segment = segments[page_index]
         if int(table.token_counts[page_index].item()) != _segment_tokens(key_segment):
             raise ValueError(f"page_table token count mismatch at page {page_index}")
         _launch_fused_page(
@@ -487,6 +740,7 @@ def fused_dart_attention(
             running_output,
             scale=factor,
         )
+        page_index += 1
     return (running_output / running_sum.clamp_min(1e-20).unsqueeze(-1)).unsqueeze(2).to(query.dtype)
 
 

@@ -109,22 +109,24 @@ adapter smoke，不是 Triton fused attention 结果；模型 adapter 仍在每�
 ## Fourth-stage fused page attention
 
 在同一份固定 seed 的合成数据上，`examples/profile_reference.py` 同时运行
-Python streaming 和单 token `fused_dart_attention`。后者直接读取 packed page，
-在 Triton page kernel 内完成解包、QK、online softmax state 和 SV，仍由 Python
-wrapper 按 page 顺序发射 kernel。`[1,8,1024,128]`、32 query heads、128 page、
-128/64 K/V group、32 sink、25% promotion、A100 `cuda:0`、重复 3 次的结果：
+Python streaming、逐页 fused 和 page-run fused。后者直接读取 page-major packed
+page，在一个 Triton program 内循环连续 uniform page，并跨页更新 online softmax
+state。`[1,8,2048,128]`、32 query heads、128 page、128/64 K/V group、32 sink、
+无 promotion、A100 `cuda:0`、重复 5 次的结果：
 
 | path | average latency | temporary peak | max abs vs quantized dense | RMSE |
 | --- | ---: | ---: | ---: | ---: |
 | dense attention | 0.151 ms | 51,964,928 B | — | — |
-| Python page streaming | 138.21 ms | 35,535,360 B | `1.83e-4` | `3.59e-5` |
-| Triton fused page | 1.79 ms | 34,951,168 B | `1.53e-4` | `3.31e-5` |
+| Python page streaming | 320.50 ms | 62,429,696 B | `1.53e-4` | `2.35e-5` |
+| Triton fused page（逐页） | 4.42 ms | 61,845,504 B | `1.53e-4` | `2.15e-5` |
+| Triton fused page-run（15 pages/launch） | 2.32 ms | 61,845,504 B | `1.53e-4` | `2.15e-5` |
 
-相对 Python page streaming，当前 fused page reference 约快 77 倍；相对 dense
-attention 仍慢约一个数量级。该差距来自 Python page wrapper、每页 kernel launch、
-packed metadata 访问和尚未融合的 page table/batch 调度，不能把这组数据写成
-端到端模型加速结论。Chrome trace 可用 profile 脚本的 `--trace` 同时导出两条
-attention 路径。
+相对 Python page streaming，page-run reference 约快 `138×`，相对逐页 fused
+约减少 `47%` 延迟；相对 dense attention 仍慢约一个数量级。page-run 的构建耗时
+约 `1.01 ms`，属于 cache 生命周期成本，应在 append 后缓存。该差距仍来自
+packed metadata 访问、单 query-head program 和尚未融合的物理 page table/batch
+调度，不能把这组数据写成端到端模型加速结论。Chrome trace 可用 profile 脚本的
+`--trace` 导出 streaming 与 page-run attention 路径。
 
 本次 page-table smoke 使用 `T=128,page=32,Hkv=2,Hq=4,D=32`，构建并验证
 `DartPageTable` 的耗时为 `41.15 ms`。该成本来自 device tensor 创建和完整

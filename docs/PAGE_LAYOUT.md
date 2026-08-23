@@ -89,5 +89,20 @@ beam reorder 时调用 `reorder(indices)`，只重排 batch 行，不复制 pack
 
 当前 fused wrapper 已从 page table 读取 page 数、token 数和 batch/device 元数据；
 page table 的构建应在 cache update 或 beam reorder 后完成一次并缓存，不要在每个
-decode token 内重新构建。后续 device-side page-run kernel 会直接消费这些 tensor，
-再移除 Python 的逐 page 遍历。
+decode token 内重新构建。连续的 uniform full page 可以进一步调用
+`table.uniform_quantized_runs(cache)`，得到 `DartPageRun`：所有 packed K/V 与
+scale/min 都沿第 0 维按 page stack，`page_indices` 仍保留原 table 的逻辑 ID。
+
+```python
+table = cache.page_table(device=query.device).validate()
+runs = table.uniform_quantized_runs(cache)
+output = fused_dart_attention(
+    query, cache, page_table=table, page_runs=runs, fallback=False
+)
+```
+
+run 只合并连续、相同布局且长度等于 `page_size` 的 uniform quantized K/V；dense
+sink、mixed key 和 pending tail 会终止 run，继续走逐页 kernel。传入 `page_runs=()`
+可强制逐页对照。当前 run kernel 在一个 `(batch, query_head)` Triton program 内
+循环 page，并跨页更新 online softmax 的 `m/l/o`；Python 仍负责生命周期与逻辑 ID
+校验，物理 allocator 和 mixed run 留待后续里程碑。

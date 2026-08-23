@@ -103,6 +103,10 @@ def main(argv: list[str] | None = None) -> int:
     page_table = cache.page_table(device=device).validate()
     _sync(device)
     page_table_ms = (time.perf_counter() - page_table_start) * 1000
+    page_run_start = time.perf_counter()
+    page_runs = page_table.uniform_quantized_runs(cache)
+    _sync(device)
+    page_run_ms = (time.perf_counter() - page_run_start) * 1000
     # Keep the dense tensors for the numerical oracle, then measure the two
     # materialization stages separately. ``segment_dequantize`` includes the
     # packed unpack operation; ``materialize`` additionally concatenates pages.
@@ -116,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         values.repeat_interleave(args.query_heads // args.kv_heads, dim=1),
     )
     streamed = streamed_dart_attention(query, cache)
-    fused = fused_dart_attention(query, cache, page_table=page_table)
+    fused = fused_dart_attention(query, cache, page_table=page_table, page_runs=page_runs)
     stream_error = streamed.float() - expected.float()
     fused_error = fused.float() - expected.float()
     quant_error = expected.float() - original_expected.float()
@@ -127,7 +131,10 @@ def main(argv: list[str] | None = None) -> int:
     dense_ms, dense_peak = _measure(lambda: dense_attention(query, expanded_keys, expanded_values), device, args.repeats)
     streamed_ms, streamed_peak = _measure(lambda: streamed_dart_attention(query, cache), device, args.repeats)
     fused_ms, fused_peak = _measure(
-        lambda: fused_dart_attention(query, cache, page_table=page_table), device, args.repeats
+        lambda: fused_dart_attention(query, cache, page_table=page_table, page_runs=page_runs), device, args.repeats
+    )
+    per_page_fused_ms, per_page_fused_peak = _measure(
+        lambda: fused_dart_attention(query, cache, page_table=page_table, page_runs=()), device, args.repeats
     )
 
     trace_path = None
@@ -144,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         profiler.export_chrome_trace(str(trace_path))
         fused_trace_path = output_dir / f"dart_fused_attention_{args.tokens}_{args.promote_ratio:g}.json"
         with torch.profiler.profile(activities=activities, record_shapes=True, profile_memory=True) as profiler:
-            fused_dart_attention(query, cache, page_table=page_table)
+            fused_dart_attention(query, cache, page_table=page_table, page_runs=page_runs)
         profiler.export_chrome_trace(str(fused_trace_path))
 
     result = {
@@ -160,17 +167,22 @@ def main(argv: list[str] | None = None) -> int:
         "seed": args.seed,
         "quantize_and_store_ms": quantize_ms,
         "page_table_build_ms": page_table_ms,
+        "page_run_build_ms": page_run_ms,
+        "page_run_count": len(page_runs),
+        "page_run_pages": sum(run.page_count for run in page_runs),
         "segment_dequantize_ms": segment_dequantize_ms,
         "materialize_ms": materialize_ms,
         "dense_attention_ms": dense_ms,
         "streamed_attention_ms": streamed_ms,
         "fused_page_attention_ms": fused_ms,
+        "per_page_fused_attention_ms": per_page_fused_ms,
         "fused_page_attention_backend": "triton" if device.type == "cuda" and triton_available() else "pytorch-fallback",
         "segment_dequantize_peak_bytes": segment_dequantize_peak,
         "materialize_peak_bytes": materialize_peak,
         "dense_peak_bytes": dense_peak,
         "streamed_peak_bytes": streamed_peak,
         "fused_page_attention_peak_bytes": fused_peak,
+        "per_page_fused_attention_peak_bytes": per_page_fused_peak,
         "max_abs_stream_error": float(stream_error.abs().max().cpu()),
         "rmse_stream_error": float(stream_error.square().mean().sqrt().cpu()),
         "max_abs_fused_error": float(fused_error.abs().max().cpu()),

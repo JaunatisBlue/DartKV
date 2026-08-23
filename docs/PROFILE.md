@@ -101,12 +101,22 @@ streaming `136.28 ms`。streaming 对量化 dense 的 max abs/RMSE 为
 `1.83e-4`/`3.59e-5`，packed storage `1,133,568` bytes，相对 dense
 `4,194,304` bytes 为 `3.70×`；streaming 临时峰值为 `35,510,784` bytes。
 
-同一配置下，单 token `fused_dart_attention` 为 `1.79 ms`，临时峰值为
-`34,951,168 bytes`，对量化 dense 的 max abs/RMSE 为 `1.53e-4`/`3.31e-5`。
-它相对于仍按 query head/page 发射解包的 Python streaming (`136.28 ms`) 约快
-`77×`，但仍比 dense attention (`0.151 ms`) 慢约一个数量级；这只是说明把
-page 解包、QK、online softmax、SV 放进同一个 page kernel 是正确方向，并不代表
-已经达到 Kitty 或最终 CUDA kernel 的性能。
+在 mixed-key 配置下（25% promotion）不会错误合并 page，仍使用逐页 kernel；
+`page_run_count=0` 是预期结果。uniform 配置（promotion=0）则把 sink 之后的
+15 个 full page 合并为一个 run。A100、`[1,8,2048,128]`、32 query heads、
+128 page、128/64 K/V group、32 sink、重复 5 次的实测为：
+
+| path | average latency | temporary peak | max abs vs quantized dense | RMSE |
+| --- | ---: | ---: | ---: | ---: |
+| dense attention | 0.206 ms | 95,898,624 B | — | — |
+| Python page streaming | 320.50 ms | 62,429,696 B | `1.53e-4` | `2.35e-5` |
+| Triton fused page（逐页） | 4.42 ms | 61,845,504 B | `1.53e-4` | `2.15e-5` |
+| Triton fused page-run（15 pages/launch） | 2.32 ms | 61,845,504 B | `1.53e-4` | `2.15e-5` |
+
+page-run 相对逐页 fused 约减少 47% 延迟；run 构建本身约 `1.01 ms`，应在 cache
+append 后缓存，不计入稳定 decode token latency。它相对 dense attention 仍慢约
+一个数量级，说明后续重点仍是更大的 query tile、物理 page table 和 mixed-run
+融合，而不是把这组 reference 数字解读为端到端模型加速。
 
 这个结果不能与第三轮的单 segment profile 直接比较：第四轮按真实 page 边界
 拆分，并且 fused reference 仍由 Python wrapper 顺序发射 page kernel。下一步的
