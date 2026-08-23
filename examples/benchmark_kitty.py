@@ -27,6 +27,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
     parser.add_argument(
+        "--protocol",
+        choices=("paper", "artifact"),
+        default="paper",
+        help="paper uses the ~100-token Figure 5 prompt length; artifact keeps the full checked-in prompt",
+    )
+    parser.add_argument(
         "--cache",
         choices=("dense", "dart", "kitty-reference", "kitty-engine"),
         default="dart",
@@ -38,6 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the Kitty reference prompt; omitted uses prompt-choice below",
     )
     parser.add_argument("--prompt-choice", type=int, choices=(1, 2, 3), default=1)
+    parser.add_argument(
+        "--paper-prompt-tokens",
+        type=int,
+        default=100,
+        help="Exact prompt-token budget used for the paper protocol",
+    )
     parser.add_argument(
         "--chat-template",
         action=argparse.BooleanOptionalAction,
@@ -74,6 +86,26 @@ def _dtype(name: str) -> torch.dtype:
 def _sync(device: torch.device) -> None:
     if device.type == "cuda":
         torch.cuda.synchronize(device)
+
+
+def _limit_prompt_inputs(inputs, target_tokens: int, tail_tokens: int = 8):
+    """Fit a reference prompt to Figure 5's token budget while retaining its chat suffix."""
+    current_tokens = inputs.input_ids.shape[-1]
+    if target_tokens <= 0:
+        raise ValueError("paper-prompt-tokens must be positive")
+    if current_tokens < target_tokens:
+        raise ValueError(
+            f"reference prompt has {current_tokens} tokens, fewer than requested {target_tokens}"
+        )
+    if current_tokens == target_tokens:
+        return inputs
+    preserved_tail = min(tail_tokens, target_tokens // 2)
+    head_tokens = target_tokens - preserved_tail
+    for name in ("input_ids", "attention_mask"):
+        tensor = getattr(inputs, name, None)
+        if tensor is not None:
+            setattr(inputs, name, torch.cat((tensor[:, :head_tokens], tensor[:, -preserved_tail:]), dim=-1))
+    return inputs
 
 
 def _dense_storage(cache) -> int:
@@ -210,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
             tokenize=False,
         )
     inputs = tokenizer(texts, return_tensors="pt", padding=True)
+    if args.protocol == "paper" and args.prompt is None:
+        inputs = _limit_prompt_inputs(inputs, args.paper_prompt_tokens)
     input_ids = inputs.input_ids.to(device)
     attention_mask = inputs.attention_mask.to(device)
     if input_ids.shape[-1] >= args.max_seq_len:
@@ -282,10 +316,13 @@ def main(argv: list[str] | None = None) -> int:
     peak_memory = torch.cuda.max_memory_allocated(device) if device.type == "cuda" else None
     avg_ms = sum(timings) / len(timings)
     generated_tokens = args.batch_size * (args.max_seq_len - input_ids.shape[-1])
+    sequence_tokens = args.batch_size * args.max_seq_len
+    elapsed_seconds = avg_ms / 1000
     result = {
         "model": str(model_path),
         "cache": args.cache,
         "task_name": task_name,
+        "protocol": args.protocol,
         "prompt_choice": args.prompt_choice,
         "prompt_source": "custom" if args.prompt is not None else "kitty-reference",
         "chat_template": args.chat_template,
@@ -293,6 +330,7 @@ def main(argv: list[str] | None = None) -> int:
         "prompt_tokens": int(input_ids.shape[-1]),
         "max_seq_len": args.max_seq_len,
         "generated_tokens": generated_tokens,
+        "sequence_tokens": sequence_tokens,
         "warmup_runs": args.warmup_runs,
         "repeat_runs": args.repeat_runs,
         "device": str(device),
@@ -300,7 +338,9 @@ def main(argv: list[str] | None = None) -> int:
         "attn_implementation": args.attn_implementation,
         "seed": args.seed,
         "average_elapsed_ms": avg_ms,
-        "tokens_per_second": generated_tokens / (avg_ms / 1000),
+        "tokens_per_second": sequence_tokens / elapsed_seconds,
+        "sequence_tokens_per_second": sequence_tokens / elapsed_seconds,
+        "generated_tokens_per_second": generated_tokens / elapsed_seconds,
         "peak_memory_bytes": peak_memory,
         "records": records,
         "dart_config": vars(args) if args.cache == "dart" else None,
@@ -309,7 +349,9 @@ def main(argv: list[str] | None = None) -> int:
     }
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{model_path.name}_{args.cache}_b{args.batch_size}_l{args.max_seq_len}.json"
+    output_path = output_dir / (
+        f"{model_path.name}_{args.cache}_{args.protocol}_b{args.batch_size}_l{args.max_seq_len}.json"
+    )
     output_path.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({**result, "result_path": str(output_path)}, indent=2))
     del model

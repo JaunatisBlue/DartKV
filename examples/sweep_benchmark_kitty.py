@@ -12,6 +12,7 @@ from pathlib import Path
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
+    parser.add_argument("--protocol", choices=("paper", "artifact"), default="paper")
     parser.add_argument("--cache", choices=("dense", "dart", "kitty-reference", "kitty-engine"), default="dart")
     parser.add_argument("--batches", nargs="+", type=int, default=[1, 2, 4, 8, 16, 32, 64, 128, 256])
     parser.add_argument("--device", default="cuda:0")
@@ -23,6 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Transformers attention backend for dense/reference caches",
     )
     parser.add_argument("--max-seq-len", type=int, default=8192)
+    parser.add_argument("--paper-prompt-tokens", type=int, default=100)
     parser.add_argument("--warmup-runs", type=int, default=2)
     parser.add_argument("--repeat-runs", type=int, default=3)
     parser.add_argument("--output", default="results/kitty_latency_sweep")
@@ -41,8 +43,10 @@ def main(argv: list[str] | None = None) -> int:
             str(runner),
             "--model", args.model,
             "--cache", args.cache,
+            "--protocol", args.protocol,
             "--batch-size", str(batch),
             "--max-seq-len", str(args.max_seq_len),
+            "--paper-prompt-tokens", str(args.paper_prompt_tokens),
             "--warmup-runs", str(args.warmup_runs),
             "--repeat-runs", str(args.repeat_runs),
             "--device", args.device,
@@ -54,7 +58,9 @@ def main(argv: list[str] | None = None) -> int:
         completed = subprocess.run(command, text=True, capture_output=True, check=False)
         record: dict = {"batch_size": batch, "returncode": completed.returncode}
         if completed.returncode == 0:
-            path = output_dir / f"{Path(args.model).name}_{args.cache}_b{batch}_l{args.max_seq_len}.json"
+            path = output_dir / (
+                f"{Path(args.model).name}_{args.cache}_{args.protocol}_b{batch}_l{args.max_seq_len}.json"
+            )
             if path.is_file():
                 record.update(json.loads(path.read_text()))
         else:
@@ -64,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         (output_dir / "sweep_progress.json").write_text(json.dumps({
             "model": args.model,
             "cache": args.cache,
+            "protocol": args.protocol,
             "device": args.device,
             "dtype": args.dtype,
             "attn_implementation": args.attn_implementation,

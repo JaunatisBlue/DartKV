@@ -11,7 +11,11 @@ from examples.reproduce_kitty import (
     _stop_words,
     _summarize_repeats,
 )
-from examples.benchmark_kitty import _kitty_prompt, build_parser as build_benchmark_parser
+from examples.benchmark_kitty import (
+    _kitty_prompt,
+    _limit_prompt_inputs,
+    build_parser as build_benchmark_parser,
+)
 from dart.mixed import quantize_key_mixed
 from dart.quantization import quantize
 from dart import DartKVCacheConfig
@@ -53,6 +57,21 @@ def test_latency_prompt_is_the_kitty_reference_gsm8k_prompt():
 def test_latency_benchmark_defaults_to_official_flash_attention_prefill():
     args = build_benchmark_parser().parse_args(["--model", "/models/Qwen3-8B"])
     assert args.attn_implementation == "flash_attention_2"
+    assert args.protocol == "paper"
+    assert args.paper_prompt_tokens == 100
+
+
+def test_paper_latency_prompt_keeps_exact_budget_and_chat_suffix():
+    import torch
+    from transformers.tokenization_utils_base import BatchEncoding
+
+    inputs = BatchEncoding({
+        "input_ids": torch.arange(120).reshape(1, 120),
+        "attention_mask": torch.ones(1, 120, dtype=torch.long),
+    })
+    limited = _limit_prompt_inputs(inputs, 100)
+    assert limited.input_ids.shape == (1, 100)
+    assert limited.input_ids[0, -8:].tolist() == list(range(112, 120))
 
 
 def test_repeat_summary_reports_maximum_deviation():

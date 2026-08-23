@@ -235,32 +235,37 @@ cache, for a direct semantic baseline:
 
 ```bash
 python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
-  --cache dart --batch-size 32 --max-seq-len 8192 \
+  --cache dart --protocol paper --batch-size 32 --max-seq-len 8192 \
   --warmup-runs 2 --repeat-runs 3 --device cuda:0
 
 python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
-  --cache dense --attn-implementation flash_attention_2 \
+  --cache dense --protocol paper --attn-implementation flash_attention_2 \
   --batch-size 1 --max-seq-len 8192 --device cuda:0
 ```
 
-The default is Kitty's `prompt_choice=1` (the GSM8K few-shot prompt, roughly
-1179 Qwen3 chat-template tokens) with the chat template enabled. Use
-`--no-chat-template` only for an explicitly different protocol.
+The default `--protocol paper` retains Kitty's reference prompt and chat suffix
+but fits it to exactly 100 tokens, matching the prompt length stated in Figure
+5. `--protocol artifact` keeps the full checked-in `prompt_choice=1` GSM8K
+few-shot prompt, which is 1179 Qwen3 chat-template tokens. This paper/artifact
+distinction is recorded in every result; use `--no-chat-template` only for an
+explicitly different protocol.
 
-The benchmark reports generated tokens/s, peak memory, storage ratio, and a
-prefix of generated token IDs; `kitty-reference` is the simulation cache and
-does not claim the custom Kitty Triton engine's throughput.
+The benchmark reports both complete-sequence and newly-generated tokens/s,
+peak memory, storage ratio, and a prefix of generated token IDs. The historical
+`tokens_per_second` field aliases complete-sequence throughput, the Figure 5
+metric. `kitty-reference` is the simulation cache and does not claim the custom
+Kitty Triton engine's throughput.
 
 To reproduce Figure 5's increasing-batch protocol, run the subprocess-isolated
 sweep (an OOM batch is recorded and terminates the sweep cleanly):
 
 ```bash
 python examples/sweep_benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
-  --cache dense --attn-implementation flash_attention_2 \
+  --cache dense --protocol paper --attn-implementation flash_attention_2 \
   --max-seq-len 8192 --device cuda:0
 
 python examples/sweep_benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
-  --cache kitty-engine --max-seq-len 8192 --device cuda:0
+  --cache kitty-engine --protocol paper --max-seq-len 8192 --device cuda:0
 ```
 
 ## Reference provenance

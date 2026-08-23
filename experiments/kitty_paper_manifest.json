@@ -144,6 +144,8 @@
     "gpu": "A100 80GB",
     "max_sequence_length": 8192,
     "prompt_tokens_approx": 100,
+    "artifact_prompt_tokens_with_qwen_chat_template": 1179,
+    "prompt_conflict": "paper states prompts around 100 tokens; checked-in latency default prompt_choice=1 is 1179 tokens after the Qwen3 chat template",
     "reported_claims": {"batch_size_gain": "8x", "throughput_gain": "2.1x-4.1x"}
   }
 }
