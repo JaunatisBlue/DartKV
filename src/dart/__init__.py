@@ -2,6 +2,7 @@
 
 from .cache import DartKVCache, DartKVCacheConfig, DartPageMetadata, DartSegmentLayout
 from .attention import dense_attention, streamed_dart_attention
+from .fused_attention import fused_dart_attention
 from .mixed import MixedQuantizedKey, quantize_key_mixed, select_key_channels
 from .quantization import QuantizedTensor, dequantize, quantize, quantize_axis
 from .triton_ops import TRITON_AVAILABLE, triton_available, triton_dequantize
@@ -12,6 +13,7 @@ __all__ = [
     "DartPageMetadata",
     "DartSegmentLayout",
     "dense_attention",
+    "fused_dart_attention",
     "QuantizedTensor",
     "MixedQuantizedKey",
     "dequantize",
