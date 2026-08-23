@@ -125,3 +125,9 @@ attention 仍慢约一个数量级。该差距来自 Python page wrapper、每�
 packed metadata 访问和尚未融合的 page table/batch 调度，不能把这组数据写成
 端到端模型加速结论。Chrome trace 可用 profile 脚本的 `--trace` 同时导出两条
 attention 路径。
+
+本次 page-table smoke 使用 `T=128,page=32,Hkv=2,Hq=4,D=32`，构建并验证
+`DartPageTable` 的耗时为 `41.15 ms`。该成本来自 device tensor 创建和完整
+不变量检查，应该在 cache append/reorder 后缓存；不能把它放入每 token decode 的
+kernel latency。当前 fused wrapper 已接受预构建的 `page_table=` 参数，下一步
+会把 descriptor tensor 直接传入 page-run kernel。

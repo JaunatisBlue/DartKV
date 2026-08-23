@@ -73,3 +73,21 @@ output = fused_dart_attention(query[:, :, -1:, :], cache, fallback=False)
 
 `fallback=False` 会在 CPU、非单 token 或 Triton 不可用时直接报错，适合 kernel
 对照；默认 `fallback=True` 会回退到 PyTorch streaming reference。
+
+## Page table 使用方式
+
+```python
+table = cache.page_table(device=query.device).validate()
+output = fused_dart_attention(query, cache, page_table=table, fallback=False)
+```
+
+`page_ids` 的形状为 `[B, N]`，对应 Kitty 的 batch-indexed page table；当前每个
+row 的 ID 是 segment index，packed tensor 仍由 `DartKVCache` 持有。`sequence_starts`
+和 `token_counts` 是 page-major 的 int32 tensor，`key_modes`/`value_modes` 使用
+`DENSE_PAGE`、`QUANTIZED_PAGE`、`MIXED_PAGE` 三个 Dart 常量。page table 可以在
+beam reorder 时调用 `reorder(indices)`，只重排 batch 行，不复制 packed page。
+
+当前 fused wrapper 已从 page table 读取 page 数、token 数和 batch/device 元数据；
+page table 的构建应在 cache update 或 beam reorder 后完成一次并缓存，不要在每个
+decode token 内重新构建。后续 device-side page-run kernel 会直接消费这些 tensor，
+再移除 Python 的逐 page 遍历。

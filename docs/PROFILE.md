@@ -88,6 +88,11 @@ segment，不能再把多个 page 合并为一个量化对象。布局、字段�
 kernel，不是 fused attention。`fused_dart_attention` 则把单 page 的解包、QK、
 online softmax 状态更新和 SV 放进同一个 Triton program。
 
+profile 还会单独记录 `page_table_build_ms`。page table 是 Kitty 风格的
+`[batch, page_count]` device descriptor，应在 cache append 或 beam reorder 后缓存，
+不应在每个 decode token 内重复构造；本次小尺寸 smoke 的构建耗时约 `41 ms`，
+说明它属于生命周期操作，不应混入稳定 decode kernel latency。
+
 修正后的 A100 结果（`cuda:0`、seed `20260823`、`[1,8,1024,128]`、
 `Hq=32`、page/key-group/value-group 为 `128/128/64`、32 sink、25% promotion、
 重复 3 次）为：quantize+pack `232.89 ms`，分段 Triton unpack/dequantize

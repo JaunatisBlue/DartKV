@@ -99,6 +99,10 @@ def main(argv: list[str] | None = None) -> int:
     cache.update(keys, values)
     _sync(device)
     quantize_ms = (time.perf_counter() - quantize_start) * 1000
+    page_table_start = time.perf_counter()
+    page_table = cache.page_table(device=device).validate()
+    _sync(device)
+    page_table_ms = (time.perf_counter() - page_table_start) * 1000
     # Keep the dense tensors for the numerical oracle, then measure the two
     # materialization stages separately. ``segment_dequantize`` includes the
     # packed unpack operation; ``materialize`` additionally concatenates pages.
@@ -112,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         values.repeat_interleave(args.query_heads // args.kv_heads, dim=1),
     )
     streamed = streamed_dart_attention(query, cache)
-    fused = fused_dart_attention(query, cache)
+    fused = fused_dart_attention(query, cache, page_table=page_table)
     stream_error = streamed.float() - expected.float()
     fused_error = fused.float() - expected.float()
     quant_error = expected.float() - original_expected.float()
@@ -122,7 +126,9 @@ def main(argv: list[str] | None = None) -> int:
     materialize_ms, materialize_peak = _measure(lambda: cache.get(), device, args.repeats)
     dense_ms, dense_peak = _measure(lambda: dense_attention(query, expanded_keys, expanded_values), device, args.repeats)
     streamed_ms, streamed_peak = _measure(lambda: streamed_dart_attention(query, cache), device, args.repeats)
-    fused_ms, fused_peak = _measure(lambda: fused_dart_attention(query, cache), device, args.repeats)
+    fused_ms, fused_peak = _measure(
+        lambda: fused_dart_attention(query, cache, page_table=page_table), device, args.repeats
+    )
 
     trace_path = None
     fused_trace_path = None
@@ -138,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         profiler.export_chrome_trace(str(trace_path))
         fused_trace_path = output_dir / f"dart_fused_attention_{args.tokens}_{args.promote_ratio:g}.json"
         with torch.profiler.profile(activities=activities, record_shapes=True, profile_memory=True) as profiler:
-            fused_dart_attention(query, cache)
+            fused_dart_attention(query, cache, page_table=page_table)
         profiler.export_chrome_trace(str(fused_trace_path))
 
     result = {
@@ -153,6 +159,7 @@ def main(argv: list[str] | None = None) -> int:
         "dequant_backend": "triton" if device.type == "cuda" and triton_available() else "pytorch",
         "seed": args.seed,
         "quantize_and_store_ms": quantize_ms,
+        "page_table_build_ms": page_table_ms,
         "segment_dequantize_ms": segment_dequantize_ms,
         "materialize_ms": materialize_ms,
         "dense_attention_ms": dense_ms,
