@@ -1,0 +1,5 @@
+# Stable prompts for the local Qwen3 reference suite. One prompt per line.
+Give a concise definition of a key-value cache.
+Explain why autoregressive decoding reuses past keys and values.
+List two practical trade-offs of low-bit KV cache quantization.
+Write one sentence describing an online softmax accumulator.

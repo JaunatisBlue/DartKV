@@ -173,7 +173,7 @@ def run(args: argparse.Namespace) -> dict:
         "cache_storage_bytes": storage_bytes,
         "dense_cache_bytes": dense_bytes,
         "cache_compression_ratio": compression_ratio,
-        "dart_config": vars(args) if args.cache == "dart" else None,
+        "dart_config": dict(vars(args)) if args.cache == "dart" else None,
     }
 
 

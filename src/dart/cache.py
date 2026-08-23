@@ -104,6 +104,15 @@ class DartKVCache:
     def get_seq_length(self) -> int:
         return self._seen_tokens
 
+    @property
+    def shape(self) -> Optional[Tuple[int, int, int, int]]:
+        """Logical cache shape ``[batch, kv_heads, sequence, head_dim]``."""
+
+        if self._shape is None:
+            return None
+        batch, heads, head_dim = self._shape
+        return batch, heads, self._seen_tokens, head_dim
+
     def __len__(self) -> int:
         return self._seen_tokens
 
@@ -161,6 +170,19 @@ class DartKVCache:
     @property
     def compression_ratio(self) -> float:
         return self.dense_bytes / self.storage_bytes if self.storage_bytes else 1.0
+
+    def iter_segments(self) -> list[Tuple[Segment, Segment]]:
+        """Return key/value pages in sequence order for streaming attention.
+
+        The returned objects are still packed segments (except an optional
+        pending partial page), so callers can dequantize one page at a time
+        without materializing the complete cache.
+        """
+
+        pairs = list(zip(self._key_segments, self._value_segments))
+        if self._pending_key is not None:
+            pairs.append((self._pending_key, self._pending_value))
+        return pairs
 
     def to(self, device: torch.device | str) -> "DartKVCache":
         """Move all backing tensors to ``device`` and return ``self``."""

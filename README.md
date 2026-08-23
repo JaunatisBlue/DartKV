@@ -99,6 +99,21 @@ backend when comparing generated output. Dart's current adapter deliberately
 materializes dense K/V for model attention; its storage result is meaningful,
 but its latency is not evidence of a fused-kernel speedup.
 
+## Page-streaming reference attention
+
+For a kernel-oriented reference that does not call `cache.get()` first, run:
+
+```bash
+python examples/profile_reference.py --device cuda:0 --tokens 1024 \
+  --kv-heads 8 --query-heads 32 --head-dim 128 --page-size 128 \
+  --promote-ratio 0.25 --trace --output results/profile
+```
+
+The page-streaming path is deliberately slower than dense PyTorch attention at
+this stage. It is the numerical and lifecycle oracle for future Triton/CUDA
+kernels; see [docs/PROFILE.md](docs/PROFILE.md) for the recorded
+error, memory and profiling results.
+
 ## Minimal API
 
 ```python
