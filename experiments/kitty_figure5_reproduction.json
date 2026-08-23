@@ -38,6 +38,16 @@
       "kv_storage_bytes": 38649987072,
       "result": "results/kitty_figure5_paper/Qwen-8B_dense_paper_b32_l8192.json"
     },
+    "hf_static_fp16": {
+      "batch_size": 32,
+      "sequence_tokens_per_second": 611.7807510091127,
+      "generated_tokens_per_second": 604.3127242633959,
+      "elapsed_ms": 428493.3770269854,
+      "peak_memory_allocated_bytes": 55393537024,
+      "peak_memory_reserved_bytes": 55641636864,
+      "kv_storage_bytes": 38654705664,
+      "result": "results/kitty_figure5_paper/Qwen-8B_static_paper_b32_l8192.json"
+    },
     "kitty_engine": {
       "batch_size": 256,
       "sequence_tokens_per_second": 1579.9303270954729,
@@ -77,12 +87,19 @@
       "stage": "warmup DynamicCache update",
       "error": "CUDA out of memory while concatenating a new key-cache block",
       "attempted_allocation_bytes": 931135488
+    },
+    "hf_static_fp16_batch_64": {
+      "status": "oom",
+      "stage": "static KV-cache allocation",
+      "error": "CUDA out of memory while allocating the StaticCache value tensor",
+      "attempted_allocation_bytes": 1073741824
     }
   },
   "comparison": {
     "maximum_batch_size_gain": 8.0,
     "sequence_throughput_gain": 5.027067510641562,
     "generated_throughput_gain": 5.027067510641562,
+    "sequence_throughput_gain_vs_static_fp16": 2.5825106862048677,
     "batch_size_claim_reproduced": true,
     "throughput_claim_met_or_exceeded": true,
     "throughput_gain_above_reported_upper_bound_percent": 22.61140269857469
@@ -90,6 +107,7 @@
   "notes": [
     "The checked-in Kitty artifact prompt has 1179 tokens after the Qwen chat template; paper mode trims it to the paper's approximately 100-token protocol.",
     "Peak allocated memory is not directly comparable to nvidia-smi for DynamicCache because allocator reservation and fragmentation are excluded; future runs also record peak_memory_reserved_bytes.",
-    "The local endpoint is faster than, rather than below, the paper's reported maximum throughput gain."
+    "Kitty is 2.58x faster than the maximum HF Static FP16 batch, inside the paper's reported 2.1x--4.1x range.",
+    "Kitty is 5.03x faster than HF Dynamic FP16 locally, above rather than below the paper's reported maximum gain."
   ]
 }
