@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--attn-implementation",
         choices=("eager", "sdpa", "flash_attention_2"),
-        default="sdpa",
+        default="flash_attention_2",
         help="Transformers attention backend for dense/reference caches",
     )
     parser.add_argument("--max-seq-len", type=int, default=8192)

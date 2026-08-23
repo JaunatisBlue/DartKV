@@ -59,8 +59,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--attn-implementation",
         choices=("eager", "sdpa", "flash_attention_2"),
-        default="sdpa",
-        help="Transformers attention backend for dense/reference caches; kitty-engine keeps its Triton path",
+        default="flash_attention_2",
+        help="Prefill attention backend; kitty-engine uses its Triton kernel after prefill",
     )
     parser.add_argument("--seed", type=int, default=20260823)
     parser.add_argument("--output", default="results/kitty_latency")
@@ -190,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
             config=model_config,
             torch_dtype=_dtype(args.dtype),
             local_files_only=True,
-            attn_implementation="eager",
+            attn_implementation=args.attn_implementation,
         ).to(device).eval()
     else:
         model_config = None
@@ -297,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
         "repeat_runs": args.repeat_runs,
         "device": str(device),
         "dtype": args.dtype,
+        "attn_implementation": args.attn_implementation,
         "seed": args.seed,
         "average_elapsed_ms": avg_ms,
         "tokens_per_second": generated_tokens / (avg_ms / 1000),

@@ -11,7 +11,7 @@ from examples.reproduce_kitty import (
     _stop_words,
     _summarize_repeats,
 )
-from examples.benchmark_kitty import _kitty_prompt
+from examples.benchmark_kitty import _kitty_prompt, build_parser as build_benchmark_parser
 from dart.mixed import quantize_key_mixed
 from dart.quantization import quantize
 from dart import DartKVCacheConfig
@@ -48,6 +48,11 @@ def test_latency_prompt_is_the_kitty_reference_gsm8k_prompt():
     assert task_name == "gsm8k"
     assert "Janet" in prompt
     assert "The final answer is [answer]" in prompt
+
+
+def test_latency_benchmark_defaults_to_official_flash_attention_prefill():
+    args = build_benchmark_parser().parse_args(["--model", "/models/Qwen3-8B"])
+    assert args.attn_implementation == "flash_attention_2"
 
 
 def test_repeat_summary_reports_maximum_deviation():

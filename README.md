@@ -62,9 +62,9 @@ Verify both the extension and the Transformers integration before a long run:
 python -c 'import flash_attn, torch; print(flash_attn.__version__, torch.cuda.get_device_name())'
 ```
 
-The latency benchmark accepts `--attn-implementation flash_attention_2` for
-dense/standard-cache comparisons.  `kitty-engine` intentionally uses Kitty's
-own Triton attention kernel and is unaffected by that flag.
+The latency benchmark defaults to `--attn-implementation flash_attention_2`,
+matching Kitty's official script.  For `kitty-engine`, FlashAttention handles
+prefill and Kitty's own Triton attention kernel handles decode.
 
 If the environment is missing, create it first with `conda create -n dartkv
 python=3.10 -y`. Do not install the project into `base`. Verify the hardware
