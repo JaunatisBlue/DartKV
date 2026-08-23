@@ -9,7 +9,14 @@ from pathlib import Path
 
 import torch
 
-from dart import DartKVCache, DartKVCacheConfig, dense_attention, streamed_dart_attention
+from dart import (
+    DartKVCache,
+    DartKVCacheConfig,
+    dense_attention,
+    streamed_dart_attention,
+    triton_available,
+    triton_dequantize,
+)
 
 
 def _sync(device: torch.device) -> None:
@@ -37,8 +44,8 @@ def _dequantize_segments(cache: DartKVCache) -> list[tuple[torch.Tensor, torch.T
 
     segments = []
     for key_segment, value_segment in cache.iter_segments():
-        keys = key_segment if isinstance(key_segment, torch.Tensor) else key_segment.dequantize()
-        values = value_segment if isinstance(value_segment, torch.Tensor) else value_segment.dequantize()
+        keys = key_segment if isinstance(key_segment, torch.Tensor) else triton_dequantize(key_segment)
+        values = value_segment if isinstance(value_segment, torch.Tensor) else triton_dequantize(value_segment)
         segments.append((keys, values))
     return segments
 
@@ -134,6 +141,7 @@ def main(argv: list[str] | None = None) -> int:
         "value_group_size": args.value_group_size,
         "sink_tokens": min(args.sink_tokens, args.tokens),
         "promote_ratio": args.promote_ratio,
+        "dequant_backend": "triton" if device.type == "cuda" and triton_available() else "pytorch",
         "seed": args.seed,
         "quantize_and_store_ms": quantize_ms,
         "segment_dequantize_ms": segment_dequantize_ms,

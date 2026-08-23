@@ -112,7 +112,10 @@ python examples/profile_reference.py --device cuda:0 --tokens 1024 \
 The page-streaming path is deliberately slower than dense PyTorch attention at
 this stage. It is the numerical and lifecycle oracle for future Triton/CUDA
 kernels; see [docs/PROFILE.md](docs/PROFILE.md) for the recorded
-error, memory and profiling results.
+error, memory and profiling results. The page field order and element-stride
+contract is documented in [docs/PAGE_LAYOUT.md](docs/PAGE_LAYOUT.md); when
+Triton is importable on CUDA, the reference uses its small dequantization
+kernels before the still-unfused attention loop.
 
 ## Minimal API
 

@@ -77,3 +77,24 @@ python examples/run_qwen3_suite.py \
   模型或 GPU 是否可用；
 - 暂不直接复制 Kitty 的 Triton kernel。下一步应固定 page metadata/stride，
   再以小 kernel 对照测试逐步迁移 low/high bit unpack 和 attention。
+
+## 第四轮 page split 与 Triton 对照
+
+第四轮修正了一个页面边界问题：一次 update 中的多个完整 page 现在会逐页生成
+segment，不能再把多个 page 合并为一个量化对象。布局、字段和 stride 约定见
+[`docs/PAGE_LAYOUT.md`](PAGE_LAYOUT.md)。`streamed_dart_attention` 和 profile
+入口在 CUDA 上会优先调用 `dart.triton_dequantize`；它仍然只是解包/反量化小
+kernel，不是 fused attention。
+
+修正后的 A100 结果（`cuda:0`、seed `20260823`、`[1,8,1024,128]`、
+`Hq=32`、page/key-group/value-group 为 `128/128/64`、32 sink、25% promotion、
+重复 3 次）为：quantize+pack `232.89 ms`，分段 Triton unpack/dequantize
+`1.11 ms`，完整 materialize `3.39 ms`，dense attention `0.151 ms`，page
+streaming `136.28 ms`。streaming 对量化 dense 的 max abs/RMSE 为
+`1.83e-4`/`3.59e-5`，packed storage `1,133,568` bytes，相对 dense
+`4,194,304` bytes 为 `3.70×`；streaming 临时峰值为 `35,510,784` bytes。
+
+这个结果不能与第三轮的单 segment profile 直接比较：第四轮按真实 page 边界
+拆分，并且每个 query/KV head/page 组合都会触发一次小 Triton 解包。下一步的
+性能工作应把解包、QK、online softmax 和 SV 融合，减少 kernel launch，而不是
+优化这个小 kernel 的单独延迟。

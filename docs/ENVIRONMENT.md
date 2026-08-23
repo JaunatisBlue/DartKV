@@ -8,6 +8,7 @@ This snapshot was captured on 2026-08-23 in `/home/yx/DartKV`.
 | Python | 3.10.20 |
 | PyTorch | 2.7.1+cu126 |
 | PyTorch CUDA runtime | 12.6 |
+| Triton | 3.3.1 |
 | CUDA available | `True` |
 | GPU count | 2 |
 | GPU | NVIDIA A100 80GB PCIe × 2 |

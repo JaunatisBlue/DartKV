@@ -91,3 +91,17 @@ the exact command, model revision or local model path, tokenizer version,
 dtype, attention backend, seed, prompt/data identifier, input/new-token
 lengths, cache configuration, and GPU selection. Do not commit model weights,
 generated bulk data, or private tokens.
+
+## Fourth-stage Qwen3 smoke
+
+为确认 page split 修正没有破坏 Transformers cache 生命周期，使用本地
+`/opt/model/Qwen/Qwen3-0.6B`、BF16、eager attention、seed `20260823`、相同
+prompt `Define a KV cache in one sentence.`，比较 dense 与 Dart mixed（sink 2、
+page 8、key/value group 8、25% promotion），均生成 `A KV cache`。这只是 cache
+adapter smoke，不是 Triton fused attention 结果；模型 adapter 仍在每层 attention
+前物化 K/V。
+
+| mode | input/new tokens | cache bytes | dense bytes | ratio | generated |
+| --- | ---: | ---: | ---: | ---: | --- |
+| dense | 8 / 3 | 1,146,880 | 1,146,880 | 1.00× | `A KV cache` |
+| Dart mixed | 8 / 3 | 616,448 | 1,146,880 | 1.86× | `A KV cache` |
