@@ -294,6 +294,19 @@ package used by the accuracy artifact; the paper's latency command labels its
 INT4 baseline as HQQ in prose but passes `backend="quanto"` in code, so results
 retain the selected backend name rather than merging the two.
 
+Aggregate completed points and render the two Figure 5 panels with:
+
+```bash
+python examples/plot_kitty_figure5.py \
+  --results results/kitty_figure5_paper \
+  --output results/kitty_figure5_paper/figure5.png
+```
+
+The plot defaults to a consistent peak-allocated memory series. Passing
+`--memory-metric reserved` plots only points that actually recorded peak
+reserved memory; it never mixes allocated fallbacks into the same line. The
+adjacent summary JSON retains both fields for audit.
+
 For a bounded kernel/launch breakdown, profile a short decode window. The
 default writes only a compact aggregate table; add `--profile-trace` only when
 a potentially gigabyte-scale Chrome trace is needed:

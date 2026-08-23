@@ -18,6 +18,7 @@ from examples.benchmark_kitty import (
     _recursive_tensor_storage,
     build_parser as build_benchmark_parser,
 )
+from examples.plot_kitty_figure5 import load_points
 from dart.mixed import quantize_key_mixed
 from dart.quantization import quantize
 from dart import DartKVCacheConfig
@@ -103,6 +104,23 @@ def test_figure5_hf_baseline_caches_are_available_on_cpu():
     assert type(quanto).__name__ == "QuantoQuantizedCache"
     assert type(hqq).__name__ == "HQQQuantizedCache"
     assert _recursive_tensor_storage(static) == 4096
+
+
+def test_figure5_plot_loader_keeps_both_memory_metrics(tmp_path):
+    result = {
+        "cache": "static",
+        "protocol": "paper",
+        "max_seq_len": 8192,
+        "batch_size": 32,
+        "generated_tokens_per_second": 600.0,
+        "sequence_tokens_per_second": 610.0,
+        "peak_memory_bytes": 50,
+        "peak_memory_reserved_bytes": 60,
+    }
+    (tmp_path / "point.json").write_text(json.dumps(result))
+    points = load_points(tmp_path, "paper", 8192, {"static"})
+    assert points[0]["peak_memory_allocated_bytes"] == 50
+    assert points[0]["peak_memory_reserved_bytes"] == 60
 
 
 def test_repeat_summary_reports_maximum_deviation():
