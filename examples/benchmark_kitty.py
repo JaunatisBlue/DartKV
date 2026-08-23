@@ -245,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
             dense_bytes = (
                 model.config.num_hidden_layers
                 * 2
+                * args.batch_size
                 * model.config.num_key_value_heads
                 * model.config.head_dim
                 * output.shape[-1]
