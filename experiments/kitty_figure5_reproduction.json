@@ -50,6 +50,22 @@
       "result": "results/kitty_figure5_paper/Qwen-8B_kitty-engine_paper_b256_l8192.json"
     }
   },
+  "curve_points": {
+    "hf_dynamic_fp16": [
+      {"batch_size": 8, "sequence_tokens_per_second": 157.40987763300362},
+      {
+        "batch_size": 16,
+        "sequence_tokens_per_second": 258.915571043695,
+        "peak_memory_allocated_bytes": 36000343552,
+        "peak_memory_reserved_bytes": 77315702784
+      },
+      {"batch_size": 32, "sequence_tokens_per_second": 314.284684610062}
+    ],
+    "kitty_engine": [
+      {"batch_size": 8, "sequence_tokens_per_second": 144.2832296406856},
+      {"batch_size": 256, "sequence_tokens_per_second": 1579.9303270954729}
+    ]
+  },
   "boundary_checks": {
     "kitty_engine_batch_512": {
       "status": "oom",

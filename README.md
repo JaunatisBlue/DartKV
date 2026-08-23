@@ -241,6 +241,14 @@ python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
 python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
   --cache dense --protocol paper --attn-implementation flash_attention_2 \
   --batch-size 1 --max-seq-len 8192 --device cuda:0
+
+python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
+  --cache static --protocol paper --batch-size 1 --max-seq-len 8192 \
+  --device cuda:0
+
+python examples/benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
+  --cache quanto --protocol paper --quantized-bits 4 --batch-size 1 \
+  --max-seq-len 8192 --device cuda:0
 ```
 
 The default `--protocol paper` retains Kitty's reference prompt and chat suffix
@@ -279,6 +287,12 @@ python examples/sweep_benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
 python examples/sweep_benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
   --cache kitty-engine --protocol paper --max-seq-len 8192 --device cuda:0
 ```
+
+`--cache static` and `--cache quanto` reproduce the other two HF baselines in
+Kitty's checked-in latency script. `--cache hqq` is also available for the HQQ
+package used by the accuracy artifact; the paper's latency command labels its
+INT4 baseline as HQQ in prose but passes `backend="quanto"` in code, so results
+retain the selected backend name rather than merging the two.
 
 For a bounded kernel/launch breakdown, profile a short decode window. The
 default writes only a compact aggregate table; add `--profile-trace` only when

@@ -34,9 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cache",
-        choices=("dense", "dart", "kitty-reference", "kitty-engine"),
+        choices=("dense", "static", "quanto", "hqq", "dart", "kitty-reference", "kitty-engine"),
         default="dart",
-        help="kitty-engine uses the checked-in Triton/custom Qwen3 implementation",
+        help="dense/static/quanto/hqq are HF baselines; kitty-engine uses the checked-in Triton engine",
     )
     parser.add_argument(
         "--prompt",
@@ -66,6 +66,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--buffer-length", type=int, default=128)
     parser.add_argument("--key-group-size", type=int, default=128)
     parser.add_argument("--value-group-size", type=int, default=128)
+    parser.add_argument("--quantized-bits", type=int, choices=(2, 4), default=4)
+    parser.add_argument("--quantized-group-size", type=int, default=64)
+    parser.add_argument("--quantized-residual-length", type=int, default=128)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", choices=("fp16", "bf16", "fp32"), default="fp16")
     parser.add_argument(
@@ -126,6 +129,30 @@ def _dense_storage(cache) -> int:
     return sum(tensor.numel() * tensor.element_size() for tensor in tensors)
 
 
+def _recursive_tensor_storage(value, seen: set[int] | None = None) -> int:
+    """Count physical tensors inside HF caches, including quantizer wrappers."""
+    if seen is None:
+        seen = set()
+    identity = id(value)
+    if identity in seen:
+        return 0
+    seen.add(identity)
+    if isinstance(value, torch.Tensor):
+        # Quanto/HQQ tensor subclasses expose their packed representation as
+        # attributes; count those physical tensors instead of the virtual view.
+        attributes = vars(value)
+        nested = sum(_recursive_tensor_storage(item, seen) for item in attributes.values())
+        return nested or value.numel() * value.element_size()
+    if isinstance(value, dict):
+        return sum(_recursive_tensor_storage(item, seen) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return sum(_recursive_tensor_storage(item, seen) for item in value)
+    attributes = getattr(value, "__dict__", None)
+    if isinstance(attributes, dict):
+        return sum(_recursive_tensor_storage(item, seen) for item in attributes.values())
+    return 0
+
+
 def _kitty_engine_storage(cache) -> int:
     tensors = []
     for layer in cache.kv_cache:
@@ -148,11 +175,38 @@ def _kitty_engine_storage(cache) -> int:
     return sum(tensor.numel() * tensor.element_size() for tensor in tensors)
 
 
-def _new_cache(args: argparse.Namespace):
+def _new_cache(args: argparse.Namespace, model_config):
     if args.cache == "dense":
         from transformers import DynamicCache
 
         return DynamicCache()
+    if args.cache == "static":
+        from transformers import StaticCache
+
+        return StaticCache(
+            config=model_config,
+            max_batch_size=args.batch_size,
+            max_cache_len=args.max_seq_len,
+            device=args.device,
+            dtype=_dtype(args.dtype),
+        )
+    if args.cache in ("quanto", "hqq"):
+        from transformers import HQQQuantizedCache, QuantoQuantizedCache, QuantizedCacheConfig
+
+        backend = "quanto" if args.cache == "quanto" else "HQQ"
+        axis = 0 if args.cache == "quanto" else 1
+        cache_config = QuantizedCacheConfig(
+            backend=backend,
+            nbits=args.quantized_bits,
+            axis_key=axis,
+            axis_value=axis,
+            q_group_size=args.quantized_group_size,
+            residual_length=args.quantized_residual_length,
+            compute_dtype=_dtype(args.dtype),
+            device=args.device,
+        )
+        cache_class = QuantoQuantizedCache if args.cache == "quanto" else HQQQuantizedCache
+        return cache_class(cache_config)
     if args.cache == "kitty-reference":
         reference_src = Path(__file__).resolve().parents[1] / "reference" / "code" / "Kitty" / "src"
         sys.path.insert(0, str(reference_src))
@@ -236,13 +290,13 @@ def main(argv: list[str] | None = None) -> int:
             attn_implementation=args.attn_implementation,
         ).to(device).eval()
     else:
-        model_config = None
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=_dtype(args.dtype),
             local_files_only=True,
             attn_implementation=args.attn_implementation,
         ).to(device).eval()
+        model_config = model.config
     task_name, reference_prompt = _kitty_prompt(args.prompt_choice)
     prompt = args.prompt if args.prompt is not None else reference_prompt
     texts = [prompt] * args.batch_size
@@ -261,7 +315,11 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("max-seq-len must exceed the tokenized prompt length")
 
     def generate_once():
-        cache = _new_engine_cache(args, model_config) if args.cache == "kitty-engine" else _new_cache(args)
+        cache = (
+            _new_engine_cache(args, model_config)
+            if args.cache == "kitty-engine"
+            else _new_cache(args, model_config)
+        )
         with torch.inference_mode():
             generate_kwargs = {
                 "input_ids": input_ids,
@@ -298,10 +356,22 @@ def main(argv: list[str] | None = None) -> int:
                 * torch.tensor([], dtype=_dtype(args.dtype)).element_size()
             )
             ratio = dense_bytes / storage_bytes if storage_bytes else 1.0
-        else:
+        elif args.cache in ("dense", "static", "kitty-reference"):
             storage_bytes = _dense_storage(cache)
             dense_bytes = storage_bytes
             ratio = 1.0
+        else:
+            storage_bytes = _recursive_tensor_storage(cache)
+            dense_bytes = (
+                model.config.num_hidden_layers
+                * 2
+                * args.batch_size
+                * model.config.num_key_value_heads
+                * model.config.head_dim
+                * output.shape[-1]
+                * torch.tensor([], dtype=_dtype(args.dtype)).element_size()
+            )
+            ratio = dense_bytes / storage_bytes if storage_bytes else 1.0
         del cache
         return output, storage_bytes, dense_bytes, ratio
 
@@ -374,6 +444,20 @@ def main(argv: list[str] | None = None) -> int:
         "peak_memory_reserved_bytes": peak_memory_reserved,
         "records": records,
         "dart_config": vars(args) if args.cache == "dart" else None,
+        "hf_cache_implementation": {
+            "dense": "dynamic",
+            "static": "static",
+            "quanto": "quantized",
+            "hqq": "quantized",
+        }.get(args.cache),
+        "quantized_cache_config": {
+            "backend": args.cache,
+            "nbits": args.quantized_bits,
+            "axis_key": 0 if args.cache == "quanto" else 1,
+            "axis_value": 0 if args.cache == "quanto" else 1,
+            "q_group_size": args.quantized_group_size,
+            "residual_length": args.quantized_residual_length,
+        } if args.cache in ("quanto", "hqq") else None,
         "reference_simulation": args.cache == "kitty-reference",
         "reference_engine": args.cache == "kitty-engine",
     }

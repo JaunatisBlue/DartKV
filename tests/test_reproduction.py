@@ -14,6 +14,8 @@ from examples.reproduce_kitty import (
 from examples.benchmark_kitty import (
     _kitty_prompt,
     _limit_prompt_inputs,
+    _new_cache,
+    _recursive_tensor_storage,
     build_parser as build_benchmark_parser,
 )
 from dart.mixed import quantize_key_mixed
@@ -72,6 +74,35 @@ def test_paper_latency_prompt_keeps_exact_budget_and_chat_suffix():
     limited = _limit_prompt_inputs(inputs, 100)
     assert limited.input_ids.shape == (1, 100)
     assert limited.input_ids[0, -8:].tolist() == list(range(112, 120))
+
+
+def test_figure5_hf_baseline_caches_are_available_on_cpu():
+    from transformers import Qwen3Config
+
+    config = Qwen3Config(
+        hidden_size=32,
+        intermediate_size=64,
+        num_hidden_layers=2,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        head_dim=8,
+    )
+    common = {
+        "batch_size": 2,
+        "max_seq_len": 16,
+        "device": "cpu",
+        "dtype": "fp16",
+        "quantized_bits": 4,
+        "quantized_group_size": 8,
+        "quantized_residual_length": 8,
+    }
+    static = _new_cache(argparse.Namespace(cache="static", **common), config)
+    quanto = _new_cache(argparse.Namespace(cache="quanto", **common), config)
+    hqq = _new_cache(argparse.Namespace(cache="hqq", **common), config)
+    assert type(static).__name__ == "StaticCache"
+    assert type(quanto).__name__ == "QuantoQuantizedCache"
+    assert type(hqq).__name__ == "HQQQuantizedCache"
+    assert _recursive_tensor_storage(static) == 4096
 
 
 def test_repeat_summary_reports_maximum_deviation():

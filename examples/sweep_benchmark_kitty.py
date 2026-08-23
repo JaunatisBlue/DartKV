@@ -13,7 +13,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
     parser.add_argument("--protocol", choices=("paper", "artifact"), default="paper")
-    parser.add_argument("--cache", choices=("dense", "dart", "kitty-reference", "kitty-engine"), default="dart")
+    parser.add_argument(
+        "--cache",
+        choices=("dense", "static", "quanto", "hqq", "dart", "kitty-reference", "kitty-engine"),
+        default="dart",
+    )
     parser.add_argument("--batches", nargs="+", type=int, default=[1, 2, 4, 8, 16, 32, 64, 128, 256])
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", choices=("fp16", "bf16", "fp32"), default="fp16")
@@ -25,6 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--max-seq-len", type=int, default=8192)
     parser.add_argument("--paper-prompt-tokens", type=int, default=100)
+    parser.add_argument("--quantized-bits", type=int, choices=(2, 4), default=4)
+    parser.add_argument("--quantized-group-size", type=int, default=64)
+    parser.add_argument("--quantized-residual-length", type=int, default=128)
     parser.add_argument("--warmup-runs", type=int, default=2)
     parser.add_argument("--repeat-runs", type=int, default=3)
     parser.add_argument("--output", default="results/kitty_latency_sweep")
@@ -52,6 +59,9 @@ def main(argv: list[str] | None = None) -> int:
             "--device", args.device,
             "--dtype", args.dtype,
             "--attn-implementation", args.attn_implementation,
+            "--quantized-bits", str(args.quantized_bits),
+            "--quantized-group-size", str(args.quantized_group_size),
+            "--quantized-residual-length", str(args.quantized_residual_length),
             "--output", str(output_dir),
         ]
         print("[benchmark sweep]", " ".join(command), flush=True)
@@ -74,6 +84,9 @@ def main(argv: list[str] | None = None) -> int:
             "device": args.device,
             "dtype": args.dtype,
             "attn_implementation": args.attn_implementation,
+            "quantized_bits": args.quantized_bits,
+            "quantized_group_size": args.quantized_group_size,
+            "quantized_residual_length": args.quantized_residual_length,
             "max_seq_len": args.max_seq_len,
             "records": records,
         }, ensure_ascii=False, indent=2) + "\n")
