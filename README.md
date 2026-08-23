@@ -256,7 +256,11 @@ sweep (an OOM batch is recorded and terminates the sweep cleanly):
 
 ```bash
 python examples/sweep_benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
-  --cache dart --max-seq-len 8192 --device cuda:0
+  --cache dense --attn-implementation flash_attention_2 \
+  --max-seq-len 8192 --device cuda:0
+
+python examples/sweep_benchmark_kitty.py --model /opt/model/Qwen/Qwen-8B \
+  --cache kitty-engine --max-seq-len 8192 --device cuda:0
 ```
 
 ## Reference provenance

@@ -16,6 +16,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batches", nargs="+", type=int, default=[1, 2, 4, 8, 16, 32, 64, 128, 256])
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", choices=("fp16", "bf16", "fp32"), default="fp16")
+    parser.add_argument(
+        "--attn-implementation",
+        choices=("eager", "sdpa", "flash_attention_2"),
+        default="sdpa",
+        help="Transformers attention backend for dense/reference caches",
+    )
     parser.add_argument("--max-seq-len", type=int, default=8192)
     parser.add_argument("--warmup-runs", type=int, default=2)
     parser.add_argument("--repeat-runs", type=int, default=3)
@@ -41,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
             "--repeat-runs", str(args.repeat_runs),
             "--device", args.device,
             "--dtype", args.dtype,
+            "--attn-implementation", args.attn_implementation,
             "--output", str(output_dir),
         ]
         print("[benchmark sweep]", " ".join(command), flush=True)
@@ -59,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
             "cache": args.cache,
             "device": args.device,
             "dtype": args.dtype,
+            "attn_implementation": args.attn_implementation,
             "max_seq_len": args.max_seq_len,
             "records": records,
         }, ensure_ascii=False, indent=2) + "\n")
