@@ -485,3 +485,12 @@ def test_humaneval_requires_explicit_unsafe_code_confirmation():
         "--task", "humaneval_instruct",
     ])
     assert args.confirm_run_unsafe_code is False
+
+
+def test_humaneval_sandbox_is_offline_and_uses_disposable_caches():
+    script = (Path(__file__).parents[1] / "examples" / "run_humaneval_sandbox.sh").read_text()
+    assert "--unshare-net" in script
+    assert "--ro-bind / /" in script
+    assert "HF_METRICS_CACHE=/tmp/hf_metrics" in script
+    assert "HF_DATASETS_OFFLINE=1" in script
+    assert "humaneval_hf_datasets" in script
