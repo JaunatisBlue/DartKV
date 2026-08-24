@@ -43,7 +43,8 @@
     "static_cache_cuda_generation": "passed",
     "dart_qwen3_8b_fused_decode_smoke": "passed",
     "direct_kitty_operator_facade": "passed",
-    "operator_identity_and_source_hash_audit": "experiments/kitty_operator_audit.json"
+    "operator_identity_and_source_hash_audit": "experiments/kitty_operator_audit.json",
+    "qwen3_8b_exact_sampling_checkpoint": "validated on FP16 repeat0 and Kitty-Pro repeat1, batch16"
   },
   "datasets": {
     "gpqa_diamond": {
