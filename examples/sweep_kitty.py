@@ -26,7 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--protocol", choices=("paper", "artifact"), default="paper")
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dtype", choices=("fp16", "bf16", "fp32"), default="fp16")
-    parser.add_argument("--batch-size", type=int, default=1)
+    # Keep Figure 4 on the same A100-safe formal accuracy protocol as Table 3:
+    # batch16 with request-level checkpointing.  Override explicitly for a
+    # smoke run; the total Qwen3-8B gate rejects other formal signatures.
+    parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--max-new-tokens", type=int, default=4096)

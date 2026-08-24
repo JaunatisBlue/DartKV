@@ -239,7 +239,7 @@ and the repository read-only (except its result directory):
 
 ```bash
 bash examples/run_humaneval_sandbox.sh \
-  results/kitty_qwen8_paper_b1 cuda:0 kitty-pro
+  results/kitty_qwen8_paper_b16 cuda:0 kitty-pro
 ```
 
 The normal runner no longer auto-confirms unsafe code; HumanEval requires the
@@ -271,7 +271,7 @@ Figure 4's 11-point random/magnitude promotion sweep is resumable through:
 
 ```bash
 python examples/sweep_kitty.py --model /opt/model/Qwen/Qwen-8B \
-  --device cuda:0 --repeats 3 --max-new-tokens 4096
+  --device cuda:0 --batch-size 16 --repeats 3 --max-new-tokens 4096
 ```
 
 Use `--limit 8` to validate the sweep wiring before scheduling the full
