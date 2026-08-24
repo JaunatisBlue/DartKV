@@ -392,3 +392,31 @@ def test_qwen3_8b_completion_audit_rejects_accuracy_batch16(tmp_path):
     issues = accuracy_signature_issues(report, "table3")
     assert issues[0]["expected"]["batch_size"] == 1
     assert issues[0]["actual"]["batch_size"] == 16
+
+
+def test_lm_eval_clones_kitty_cache_between_accuracy_requests():
+    import torch
+    from lm_eval.models.utils import normalize_gen_kwargs
+
+    reference_src = Path(__file__).parents[1] / "reference" / "code" / "Kitty" / "src"
+    sys.path.insert(0, str(reference_src))
+    from kitty_sim import KittyKVCache, KittyKVCacheConfig
+
+    original = KittyKVCache(KittyKVCacheConfig(
+        sink_length=2,
+        buffer_length=8,
+        group_size=8,
+        promote_ratio=0.25,
+    ))
+    normalized = normalize_gen_kwargs({
+        "past_key_values": original,
+        "max_gen_toks": 16,
+        "do_sample": True,
+        "temperature": 0.6,
+    })
+    cloned = normalized["past_key_values"]
+    assert cloned is not original
+    states = torch.randn(1, 2, 3, 8, dtype=torch.float16)
+    cloned.update(states, states, 0)
+    assert cloned.get_seq_length() == 3
+    assert original.get_seq_length() == 0
