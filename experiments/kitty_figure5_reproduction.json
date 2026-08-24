@@ -91,6 +91,18 @@
         "peak_memory_reserved_bytes": 55641636864
       }
     ],
+    "hf_kivi_int4_quanto": [
+      {
+        "batch_size": 32,
+        "sequence_tokens_per_second": 139.02348661868595,
+        "generated_tokens_per_second": 137.32642257304772,
+        "peak_memory_allocated_bytes": 31169482240,
+        "peak_memory_reserved_bytes": 59515076608,
+        "kv_storage_bytes": 10961879040,
+        "dense_equivalent_kv_storage_bytes": 38654705664,
+        "kv_compression_ratio": 3.526284638149045
+      }
+    ],
     "kitty_engine": [
       {
         "batch_size": 8,
