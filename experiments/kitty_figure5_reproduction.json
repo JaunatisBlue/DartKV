@@ -167,6 +167,29 @@
     "throughput_claim_met_or_exceeded": true,
     "throughput_gain_above_reported_upper_bound_percent": 22.61140269857469
   },
+  "final_native_kernel_reproduction": {
+    "operator_facade": "dart.kitty_kernels",
+    "cache": "kitty-engine",
+    "batch32": {
+      "sequence_tokens_per_second": 556.5326021851224,
+      "generated_tokens_per_second": 549.7389913186048,
+      "peak_memory_allocated_bytes": 23912270848,
+      "peak_memory_reserved_bytes": 24387780608,
+      "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b32_l8192.json"
+    },
+    "batch256": {
+      "sequence_tokens_per_second": 1574.65377705936,
+      "generated_tokens_per_second": 1555.431929194866,
+      "peak_memory_allocated_bytes": 76519850496,
+      "peak_memory_reserved_bytes": 77366034432,
+      "kv_compression_ratio": 5.388587403387601,
+      "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b256_l8192.json"
+    },
+    "batch_size_gain": 8.0,
+    "generated_throughput_gain": 2.8294007770196625,
+    "paper_throughput_range": [2.1, 4.1],
+    "throughput_within_paper_range": true
+  },
   "notes": [
     "The checked-in Kitty artifact prompt has 1179 tokens after the Qwen chat template; paper mode trims it to the paper's approximately 100-token protocol.",
     "Peak allocated memory is not directly comparable to nvidia-smi for DynamicCache because allocator reservation and fragmentation are excluded; future runs also record peak_memory_reserved_bytes.",
