@@ -195,7 +195,8 @@ python examples/reproduce_kitty.py \
   --model /opt/model/Qwen/Qwen-8B \
   --task gsm8k_cot_llama --variant kitty-pro \
   --backend kitty-reference --protocol paper \
-  --device cuda:0 --dtype fp16 --repeats 10 --max-new-tokens 4096
+  --device cuda:0 --dtype fp16 --batch-size 1 \
+  --repeats 3 --max-new-tokens 4096
 ```
 
 `--backend kitty-reference` executes the checked-in Kitty simulation semantics;
@@ -205,6 +206,12 @@ sampling settings stated in Section 5.1 and the 25% Kitty-Pro ratio from Table
 the task YAML control sampling. This distinction is intentional: the paper and
 artifact disagree on both fields. Use `--limit 1` for a smoke run; limited runs
 are isolated under `smoke_limit_1` and cannot be mistaken for full results.
+
+Accuracy reproduction uses `--batch-size 1`, the default in Kitty's
+`accuracy_eval.sh`. With stochastic sampling, changing batch size changes RNG
+consumption and is a different accuracy protocol, not merely a speed setting.
+The Qwen3-8B completion audit rejects summaries with another batch size, fewer
+than three repeats, or the wrong generation limit.
 
 The target cells, environment, known artifact conflicts, and Figure 4/5 setup
 are recorded in `experiments/kitty_paper_manifest.json`. Audit completed full

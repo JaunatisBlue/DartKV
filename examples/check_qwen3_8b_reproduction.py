@@ -20,7 +20,7 @@ DEFAULT_FIGURE5 = REPO_ROOT / "experiments" / "kitty_figure5_reproduction.json"
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--accuracy-results", type=Path, default=Path("results/kitty_full16_native"))
+    parser.add_argument("--accuracy-results", type=Path, default=Path("results/kitty_qwen8_paper_b1"))
     parser.add_argument("--figure4-results", type=Path, default=Path("results/kitty_sweep"))
     parser.add_argument("--operator-audit", type=Path, default=DEFAULT_OPERATOR_AUDIT)
     parser.add_argument("--figure5", type=Path, default=DEFAULT_FIGURE5)
@@ -79,6 +79,52 @@ def check_figure5(path: Path) -> dict:
     }
 
 
+def accuracy_signature_issues(table_report: dict, table_name: str) -> list[dict]:
+    """Reject results produced with a different stochastic accuracy protocol."""
+
+    expected_max_new_tokens = 4096 if table_name == "table3" else 32768
+    issues = []
+    checked: set[str] = set()
+    for cell in table_report["cells"]:
+        summary_path = cell["summary_path"]
+        if summary_path in checked or not Path(summary_path).is_file():
+            continue
+        checked.add(summary_path)
+        summary = json.loads(Path(summary_path).read_text())
+        signature = summary.get("experiment_signature", {})
+        expected = {
+            "model_name": "Qwen-8B",
+            "backend": "kitty-reference",
+            "protocol": "paper",
+            "batch_size": 1,
+            "limit": None,
+            "max_new_tokens": expected_max_new_tokens,
+            "minimum_repeats": 3,
+        }
+        actual = {
+            "model_name": Path(str(signature.get("model", ""))).name,
+            "backend": signature.get("backend"),
+            "protocol": signature.get("protocol"),
+            "batch_size": signature.get("batch_size"),
+            "limit": signature.get("limit"),
+            "max_new_tokens": signature.get("max_new_tokens"),
+            "repeats": summary.get("repeats"),
+        }
+        valid = (
+            actual["model_name"] == expected["model_name"]
+            and actual["backend"] == expected["backend"]
+            and actual["protocol"] == expected["protocol"]
+            and actual["batch_size"] == expected["batch_size"]
+            and actual["limit"] is None
+            and actual["max_new_tokens"] == expected["max_new_tokens"]
+            and isinstance(actual["repeats"], int)
+            and actual["repeats"] >= expected["minimum_repeats"]
+        )
+        if not valid:
+            issues.append({"summary_path": summary_path, "expected": expected, "actual": actual})
+    return issues
+
+
 def check(args: argparse.Namespace) -> dict:
     manifest = json.loads(args.manifest.read_text())
     table_args = {
@@ -92,6 +138,8 @@ def check(args: argparse.Namespace) -> dict:
     }
     table3 = audit_table(argparse.Namespace(table="table3", **table_args))
     table4 = audit_table(argparse.Namespace(table="table4", **table_args))
+    table3_signature_issues = accuracy_signature_issues(table3, "table3")
+    table4_signature_issues = accuracy_signature_issues(table4, "table4")
 
     expected_figure4 = figure4_expected_paths(args.figure4_results, manifest)
     missing_figure4 = [str(path) for path in expected_figure4 if not path.is_file()]
@@ -111,8 +159,8 @@ def check(args: argparse.Namespace) -> dict:
     passed = all((
         operator.get("passed") is True,
         figure5["passed"],
-        table3["reproduced"],
-        table4["reproduced"],
+        table3["reproduced"] and not table3_signature_issues,
+        table4["reproduced"] and not table4_signature_issues,
         figure4["passed"],
     ))
     return {
@@ -124,13 +172,15 @@ def check(args: argparse.Namespace) -> dict:
         },
         "figure5": figure5,
         "table3": {
-            "passed": table3["reproduced"],
+            "passed": table3["reproduced"] and not table3_signature_issues,
             "counts": table3["counts"],
+            "signature_issues": table3_signature_issues,
             "incomplete_cells": [cell for cell in table3["cells"] if cell["status"] != "matched"],
         },
         "table4": {
-            "passed": table4["reproduced"],
+            "passed": table4["reproduced"] and not table4_signature_issues,
             "counts": table4["counts"],
+            "signature_issues": table4_signature_issues,
             "incomplete_cells": [cell for cell in table4["cells"] if cell["status"] != "matched"],
         },
         "figure4": figure4,

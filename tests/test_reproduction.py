@@ -7,7 +7,10 @@ import pytest
 
 from examples.check_kitty_reproduction import DEFAULT_MANIFEST, audit
 from examples.check_kitty_operator_parity import audit as audit_operator_parity
-from examples.check_qwen3_8b_reproduction import figure4_expected_paths
+from examples.check_qwen3_8b_reproduction import (
+    accuracy_signature_issues,
+    figure4_expected_paths,
+)
 from examples.reproduce_kitty import (
     _resolved_variant,
     _stop_words,
@@ -370,3 +373,22 @@ def test_qwen3_8b_completion_audit_expects_all_figure4_cells(tmp_path):
     assert len(set(paths)) == 44
     assert any("random" in str(path) for path in paths)
     assert any("magnitude" in str(path) for path in paths)
+
+
+def test_qwen3_8b_completion_audit_rejects_accuracy_batch16(tmp_path):
+    summary = tmp_path / "summary.json"
+    summary.write_text(json.dumps({
+        "repeats": 3,
+        "experiment_signature": {
+            "model": "/opt/model/Qwen/Qwen-8B",
+            "backend": "kitty-reference",
+            "protocol": "paper",
+            "batch_size": 16,
+            "limit": None,
+            "max_new_tokens": 4096,
+        },
+    }))
+    report = {"cells": [{"summary_path": str(summary)}]}
+    issues = accuracy_signature_issues(report, "table3")
+    assert issues[0]["expected"]["batch_size"] == 1
+    assert issues[0]["actual"]["batch_size"] == 16
