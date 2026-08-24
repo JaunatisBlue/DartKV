@@ -192,6 +192,13 @@
       "peak_memory_reserved_bytes": 47112519680,
       "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b128_l8192.json"
     },
+    "batch64": {
+      "sequence_tokens_per_second": 985.7463327659055,
+      "generated_tokens_per_second": 973.7132964772592,
+      "peak_memory_allocated_bytes": 31424830464,
+      "peak_memory_reserved_bytes": 31620857856,
+      "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b64_l8192.json"
+    },
     "batch_size_gain": 8.0,
     "generated_throughput_gain": 2.8294007770196625,
     "paper_throughput_range": [2.1, 4.1],
