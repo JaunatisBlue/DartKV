@@ -90,8 +90,8 @@ class DartKVCacheConfig:
             raise ValueError("the reference mixed representation currently supports promote_bits=4")
         if not 0.0 <= self.promote_ratio <= 1.0:
             raise ValueError("promote_ratio must be in [0, 1]")
-        if self.channel_selection not in {"magnitude", "variance"}:
-            raise ValueError("channel_selection must be 'magnitude' or 'variance'")
+        if self.channel_selection not in {"magnitude", "random", "variance"}:
+            raise ValueError("channel_selection must be 'magnitude', 'random', or 'variance'")
         if self.metadata_dtype not in (torch.float16, torch.bfloat16, torch.float32, torch.float64):
             raise TypeError("metadata_dtype must be a floating-point torch dtype")
 
@@ -229,18 +229,48 @@ class DartKVCache:
     def iter_segments(self) -> list[Tuple[Segment, Segment]]:
         """Return key/value pages in sequence order for streaming attention.
 
-        The returned objects are still packed segments (except an optional
-        pending partial page), so callers can dequantize one page at a time
-        without materializing the complete cache.
+        Kitty's KIVI-style value path can quantize one token at a time while
+        keys are packed page by page.  Therefore the K/V segment lists do not
+        necessarily have identical boundaries.  This method returns the union
+        of their logical boundaries; complete segments remain packed, while a
+        boundary slice is materialized only for that small interval.
         """
 
-        if len(self._key_segments) != len(self._value_segments):
-            raise RuntimeError("DartKVCache key/value segment counts diverged")
-        pairs = list(zip(self._key_segments, self._value_segments))
+        key_segments = list(self._key_segments)
+        value_segments = list(self._value_segments)
         if self._pending_key is not None:
             if self._pending_value is None:
                 raise RuntimeError("DartKVCache has a pending key without a pending value")
-            pairs.append((self._pending_key, self._pending_value))
+            key_segments.append(self._pending_key)
+            value_segments.append(self._pending_value)
+        if not key_segments or not value_segments:
+            return []
+
+        pairs: list[Tuple[Segment, Segment]] = []
+        key_index = value_index = 0
+        key_offset = value_offset = 0
+        while key_index < len(key_segments) and value_index < len(value_segments):
+            key_segment = key_segments[key_index]
+            value_segment = value_segments[value_index]
+            key_length = _segment_tokens(key_segment)
+            value_length = _segment_tokens(value_segment)
+            take = min(key_length - key_offset, value_length - value_offset)
+            if take <= 0:
+                raise RuntimeError("DartKVCache contains an empty logical segment")
+            pairs.append((
+                _slice_segment(key_segment, key_offset, key_offset + take),
+                _slice_segment(value_segment, value_offset, value_offset + take),
+            ))
+            key_offset += take
+            value_offset += take
+            if key_offset == key_length:
+                key_index += 1
+                key_offset = 0
+            if value_offset == value_length:
+                value_index += 1
+                value_offset = 0
+        if key_index != len(key_segments) or value_index != len(value_segments):
+            raise RuntimeError("DartKVCache key/value logical lengths diverged")
         return pairs
 
     def page_metadata(self) -> list[DartPageMetadata]:
@@ -430,8 +460,9 @@ class DartKVCache:
         if self._pending_value is not None:
             value_states = torch.cat((self._pending_value, value_states), dim=-2)
         quantized_tokens = max(0, value_states.shape[-2] - self.config.value_local_tokens)
-        if quantized_tokens:
-            self._quantize_value_segment(value_states[..., :quantized_tokens, :])
+        for start in range(0, quantized_tokens, self.config.page_size):
+            stop = min(start + self.config.page_size, quantized_tokens)
+            self._quantize_value_segment(value_states[..., start:stop, :])
         self._pending_value = (
             value_states[..., quantized_tokens:, :].clone()
             if quantized_tokens < value_states.shape[-2]
@@ -472,12 +503,43 @@ class DartKVCache:
             self._key_segments.append(key_segment)
 
     def _quantize_value_segment(self, value_states: torch.Tensor) -> None:
-        self._value_segments.append(quantize(
+        quantized = quantize(
             value_states,
             bits=self.config.resolved_value_bits,
             group_size=self.config.resolved_value_group_size,
             metadata_dtype=self.config.metadata_dtype,
-        ))
+        )
+        self._append_quantized_value_page(quantized)
+
+    def _append_quantized_value_page(self, segment: QuantizedTensor) -> None:
+        """Merge token-wise KIVI values into page-sized packed segments.
+
+        Kitty quantizes values one token at a time, but its CUDA attention
+        consumes page-aligned storage.  Concatenating the packed bytes and the
+        per-token metadata preserves the exact numerical result while avoiding
+        a Python/materialization boundary for every historical token.
+        """
+
+        if not self._value_segments or isinstance(self._value_segments[-1], torch.Tensor):
+            self._value_segments.append(segment)
+            return
+        previous = self._value_segments[-1]
+        if not isinstance(previous, QuantizedTensor):
+            raise RuntimeError("unexpected value segment type while coalescing pages")
+        previous_tokens = previous.original_shape[-2]
+        segment_tokens = segment.original_shape[-2]
+        if previous_tokens == self.config.page_size:
+            self._value_segments.append(segment)
+            return
+        combined = _merge_quantized_tensors([previous, segment])
+        combined_tokens = combined.original_shape[-2]
+        self._value_segments[-1] = _slice_quantized_tensor(
+            combined, 0, min(self.config.page_size, combined_tokens)
+        )
+        if combined_tokens > self.config.page_size:
+            self._value_segments.append(
+                _slice_quantized_tensor(combined, self.config.page_size, combined_tokens)
+            )
 
 
 def _materialize(segment: Segment) -> torch.Tensor:
@@ -486,6 +548,69 @@ def _materialize(segment: Segment) -> torch.Tensor:
 
 def _materialize_segments(segments: List[Segment]) -> List[torch.Tensor]:
     return [_materialize(segment) for segment in segments]
+
+
+def _segment_tokens(segment: Segment) -> int:
+    return segment.shape[-2] if isinstance(segment, torch.Tensor) else segment.original_shape[-2]
+
+
+def _slice_segment(segment: Segment, start: int, stop: int) -> Segment:
+    if start == 0 and stop == _segment_tokens(segment):
+        return segment
+    return _materialize(segment)[..., start:stop, :].contiguous()
+
+
+def _slice_quantized_tensor(segment: QuantizedTensor, start: int, stop: int) -> QuantizedTensor:
+    shape = list(segment.original_shape)
+    shape[-2] = stop - start
+    return QuantizedTensor(
+        values=segment.values[..., start:stop, :],
+        scale=segment.scale[..., start:stop, :],
+        zero_point=segment.zero_point[..., start:stop, :],
+        original_shape=tuple(shape),
+        original_dim=segment.original_dim,
+        padded_dim=segment.padded_dim,
+        packed_dim=segment.packed_dim,
+        group_size=segment.group_size,
+        bits=segment.bits,
+        output_dtype=segment.output_dtype,
+        axis=segment.axis,
+    )
+
+
+def _merge_quantized_tensors(segments: list[QuantizedTensor]) -> QuantizedTensor:
+    if not segments:
+        raise ValueError("cannot merge an empty quantized segment list")
+    reference = segments[0]
+    if any(
+        (
+            segment.original_shape[:-2] != reference.original_shape[:-2]
+            or segment.original_dim != reference.original_dim
+            or segment.padded_dim != reference.padded_dim
+            or segment.packed_dim != reference.packed_dim
+            or segment.group_size != reference.group_size
+            or segment.bits != reference.bits
+            or segment.output_dtype != reference.output_dtype
+            or segment.axis != reference.axis
+        )
+        for segment in segments[1:]
+    ):
+        raise ValueError("quantized segments have incompatible layouts")
+    shape = list(reference.original_shape)
+    shape[-2] = sum(segment.original_shape[-2] for segment in segments)
+    return QuantizedTensor(
+        values=torch.cat([segment.values for segment in segments], dim=-2),
+        scale=torch.cat([segment.scale for segment in segments], dim=-2),
+        zero_point=torch.cat([segment.zero_point for segment in segments], dim=-2),
+        original_shape=tuple(shape),
+        original_dim=reference.original_dim,
+        padded_dim=reference.padded_dim,
+        packed_dim=reference.packed_dim,
+        group_size=reference.group_size,
+        bits=reference.bits,
+        output_dtype=reference.output_dtype,
+        axis=reference.axis,
+    )
 
 
 def _segment_layout(segment: Segment) -> DartSegmentLayout:

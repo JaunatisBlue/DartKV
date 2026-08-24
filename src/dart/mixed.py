@@ -132,8 +132,8 @@ def select_key_channels(
         raise ValueError("key_states must have shape [B, H, T, D]")
     if not 0.0 <= promote_ratio <= 1.0:
         raise ValueError("promote_ratio must be in [0, 1]")
-    if strategy not in {"magnitude", "variance"}:
-        raise ValueError("strategy must be 'magnitude' or 'variance'")
+    if strategy not in {"magnitude", "random", "variance"}:
+        raise ValueError("strategy must be 'magnitude', 'random', or 'variance'")
     batch, heads, _, head_dim = key_states.shape
     count = min(head_dim, int(head_dim * promote_ratio + 1e-6))
     mask = torch.zeros(batch, heads, head_dim, dtype=torch.bool, device=key_states.device)
@@ -142,13 +142,24 @@ def select_key_channels(
     if count == head_dim:
         indices = torch.arange(head_dim, device=key_states.device).view(1, 1, -1).expand(batch, heads, -1)
         return torch.ones_like(mask), indices
-    if strategy == "magnitude":
+    if strategy == "random":
+        # Match Kitty's build_promote_mask: one torch.randperm per KV head,
+        # then share that selected channel set across the batch.
+        per_head = torch.stack([
+            torch.randperm(head_dim, device=key_states.device)[:count]
+            for _ in range(heads)
+        ], dim=0)
+        indices = per_head.unsqueeze(0).expand(batch, -1, -1)
+        mask.scatter_(-1, indices, True)
+    elif strategy == "magnitude":
         score = key_states.abs().mean(dim=-2)
+        indices = score.topk(count, dim=-1, sorted=True).indices
+        mask.scatter_(-1, indices, True)
     else:
         centered = key_states - key_states.mean(dim=-2, keepdim=True)
         score = centered.square().mean(dim=-2)
-    indices = score.topk(count, dim=-1, sorted=True).indices
-    mask.scatter_(-1, indices, True)
+        indices = score.topk(count, dim=-1, sorted=True).indices
+        mask.scatter_(-1, indices, True)
     return mask, indices
 
 

@@ -34,9 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cache",
-        choices=("dense", "static", "quanto", "hqq", "dart", "kitty-reference", "kitty-engine"),
+        choices=("dense", "static", "quanto", "hqq", "dart", "dart-engine", "kitty-reference", "kitty-engine"),
         default="dart",
-        help="dense/static/quanto/hqq are HF baselines; kitty-engine uses the checked-in Triton engine",
+        help="dense/static/quanto/hqq are HF baselines; dart-engine uses Dart fused attention; kitty-engine uses the checked-in engine",
     )
     parser.add_argument(
         "--prompt",
@@ -297,6 +297,10 @@ def main(argv: list[str] | None = None) -> int:
             attn_implementation=args.attn_implementation,
         ).to(device).eval()
         model_config = model.config
+        if args.cache == "dart-engine":
+            from dart.integrations import attach_dart_fused_attention
+
+            model = attach_dart_fused_attention(model)
     task_name, reference_prompt = _kitty_prompt(args.prompt_choice)
     prompt = args.prompt if args.prompt is not None else reference_prompt
     texts = [prompt] * args.batch_size
@@ -465,6 +469,7 @@ def main(argv: list[str] | None = None) -> int:
         } if args.cache in ("quanto", "hqq") else None,
         "reference_simulation": args.cache == "kitty-reference",
         "reference_engine": args.cache == "kitty-engine",
+        "dart_fused_engine": args.cache == "dart-engine",
     }
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)

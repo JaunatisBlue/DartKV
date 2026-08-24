@@ -15,8 +15,11 @@ axis, which matches the reference K/V distinction used by the second-stage
 experiments. Dart promotion stores low two bits for every key channel and high
 bits only for selected channels. `DartHFCache` implements the public
 Transformers `Cache` lifecycle and materializes tensors for standard eager or
-SDPA attention. It is a correctness/reference path, not yet a fused attention
-kernel: the returned K/V tensors are dense temporaries during attention.
+SDPA attention. The Qwen3-specific `dart-engine` adapter keeps prefill on the
+selected Transformers backend and routes one-token decode through Dart's
+packed-page fused attention; Python page orchestration remains a reference
+implementation, so its throughput is not yet claimed to equal Kitty's
+production Triton engine.
 
 ## Environment and installation
 
@@ -263,6 +266,11 @@ peak allocated/reserved memory, storage ratio, and a prefix of generated token
 IDs. The historical `tokens_per_second` field aliases complete-sequence
 throughput, the Figure 5 metric. `kitty-reference` is the simulation cache and
 does not claim the custom Kitty Triton engine's throughput.
+
+`--cache dart-engine` attaches Dart's Qwen3 attention adapter: prefill uses the
+selected Transformers backend and one-token decode consumes Dart packed pages
+through the fused Triton attention path. This is the implementation-under-test;
+`--cache kitty-engine` remains the checked-in Kitty reference engine.
 
 The first complete A100 endpoint check (one warmup and one measured run) found
 the following maximum successful batches. The Kitty endpoint provides the

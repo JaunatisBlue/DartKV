@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--value-group-size", type=int, default=64)
     parser.add_argument("--promote-ratio", type=float, default=0.25)
     parser.add_argument("--promote-bits", type=int, choices=(4,), default=4)
-    parser.add_argument("--channel-selection", choices=("magnitude", "variance"), default="magnitude")
+    parser.add_argument("--channel-selection", choices=("magnitude", "random", "variance"), default="magnitude")
     parser.add_argument("--sink-tokens", type=int, default=32)
     parser.add_argument("--page-size", type=int, default=128)
     parser.add_argument("--hold-partial-pages", action="store_true")

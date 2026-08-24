@@ -180,12 +180,7 @@ def _cache_for_variant(args: argparse.Namespace, variant: str):
             channel_selection=1 if config["channel_selection"] == "magnitude" else 0,
         )
         return KittyKVCache(cache_config), cache_config, config
-    if config["channel_selection"] == "random":
-        if float(config["promote_ratio"]) > 0:
-            raise ValueError("the Dart backend does not yet implement random promotion")
-        dart_selection = "magnitude"
-    else:
-        dart_selection = config["channel_selection"]
+    dart_selection = config["channel_selection"]
     from dart import DartKVCacheConfig
     from dart.integrations import DartHFCache
 

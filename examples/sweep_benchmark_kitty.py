@@ -15,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--protocol", choices=("paper", "artifact"), default="paper")
     parser.add_argument(
         "--cache",
-        choices=("dense", "static", "quanto", "hqq", "dart", "kitty-reference", "kitty-engine"),
+        choices=("dense", "static", "quanto", "hqq", "dart", "dart-engine", "kitty-reference", "kitty-engine"),
         default="dart",
     )
     parser.add_argument("--batches", nargs="+", type=int, default=[1, 2, 4, 8, 16, 32, 64, 128, 256])

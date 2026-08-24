@@ -20,6 +20,7 @@ from examples.benchmark_kitty import (
 )
 from examples.plot_kitty_figure5 import load_points
 from dart.mixed import quantize_key_mixed
+from dart.mixed import select_key_channels
 from dart.quantization import quantize
 from dart import DartKVCacheConfig
 from dart.integrations import DartHFCache
@@ -121,6 +122,67 @@ def test_figure5_plot_loader_keeps_both_memory_metrics(tmp_path):
     points = load_points(tmp_path, "paper", 8192, {"static"})
     assert points[0]["peak_memory_allocated_bytes"] == 50
     assert points[0]["peak_memory_reserved_bytes"] == 60
+
+
+def test_random_channel_selection_matches_kitty_mask_cpu():
+    import torch
+
+    reference_src = Path(__file__).parents[1] / "reference" / "code" / "Kitty" / "src"
+    sys.path.insert(0, str(reference_src))
+    from kitty_sim.utils_quant import build_promote_mask
+
+    torch.manual_seed(1234)
+    states = torch.randn(2, 3, 128, 8, dtype=torch.float16)
+    torch.manual_seed(2026)
+    reference = build_promote_mask(states.transpose(2, 3), 0.25, 0)
+    torch.manual_seed(2026)
+    dart, indices = select_key_channels(states, 0.25, strategy="random")
+    assert torch.equal(dart, reference)
+    assert torch.equal(indices[0], indices[1])
+
+
+def test_kitty_post_quant_lifecycle_matches_dart_cpu():
+    import torch
+
+    reference_src = Path(__file__).parents[1] / "reference" / "code" / "Kitty" / "src"
+    sys.path.insert(0, str(reference_src))
+    from kitty_sim import KittyKVCache, KittyKVCacheConfig
+
+    reference = KittyKVCache(KittyKVCacheConfig(
+        sink_length=2,
+        buffer_length=8,
+        group_size=8,
+        kbits=2,
+        vbits=2,
+        promote_ratio=0.25,
+        promote_bit=4,
+        channel_selection=1,
+    ))
+    from dart import DartKVCacheConfig
+    from dart.integrations import DartHFCache
+
+    dart = DartHFCache(DartKVCacheConfig(
+        key_bits=2,
+        value_bits=2,
+        key_group_size=8,
+        value_group_size=8,
+        sink_tokens=2,
+        page_size=8,
+        local_tokens=1,
+        value_local_tokens=8,
+        hold_partial_pages=True,
+        promote_bits=4,
+        promote_ratio=0.25,
+        metadata_dtype=torch.float16,
+    ))
+    torch.manual_seed(2026)
+    for tokens in [13] + [1] * 10:
+        keys = torch.randn(1, 2, tokens, 8, dtype=torch.float16)
+        values = torch.randn_like(keys)
+        ref_keys, ref_values = reference.update(keys, values, 0)
+        dart_keys, dart_values = dart.update(keys, values, 0, 0)
+        assert torch.equal(dart_keys, ref_keys)
+        assert torch.equal(dart_values, ref_values)
 
 
 def test_repeat_summary_reports_maximum_deviation():
@@ -236,3 +298,48 @@ def test_audit_reads_summary_and_marks_remaining_cells_missing(tmp_path):
     assert report["counts"]["matched"] == 1
     assert report["counts"]["missing"] == 19
     assert not report["reproduced"]
+
+
+def test_tiny_qwen3_dart_engine_generation_cpu():
+    import torch
+    from transformers import Qwen3Config, Qwen3ForCausalLM
+
+    from dart import DartKVCacheConfig
+    from dart.integrations import DartHFCache, attach_dart_fused_attention
+
+    config = Qwen3Config(
+        vocab_size=128,
+        hidden_size=32,
+        intermediate_size=64,
+        num_hidden_layers=2,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        head_dim=8,
+        max_position_embeddings=128,
+        layer_types=["full_attention", "full_attention"],
+    )
+    model = attach_dart_fused_attention(Qwen3ForCausalLM(config)).eval()
+    cache = DartHFCache(DartKVCacheConfig(
+        key_bits=2,
+        value_bits=2,
+        key_group_size=8,
+        value_group_size=8,
+        sink_tokens=2,
+        page_size=8,
+        local_tokens=1,
+        value_local_tokens=8,
+        hold_partial_pages=True,
+        promote_bits=4,
+        promote_ratio=0.25,
+        metadata_dtype=torch.float32,
+    ))
+    with torch.inference_mode():
+        output = model.generate(
+            input_ids=torch.randint(0, 128, (1, 13)),
+            max_new_tokens=20,
+            do_sample=False,
+            past_key_values=cache,
+            disable_compile=True,
+        )
+    assert output.shape == (1, 33)
+    assert cache.get_seq_length() == 32
