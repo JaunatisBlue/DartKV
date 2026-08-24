@@ -278,6 +278,17 @@ MIT Triton `quantize_pack_k/v`, `qk_kernel`, `sv_kernel`, and page allocator fro
 `kitty-engine` benchmark so the measured system path does not silently switch
 to Dart's generic reference kernels.
 
+Verify that facade and the Qwen3 model are still the exact checked-in Kitty
+objects, and record source hashes, with:
+
+```bash
+python examples/check_kitty_operator_parity.py
+```
+
+The command writes `experiments/kitty_operator_audit.json` and fails if any
+native symbol comes from outside Kitty, is wrapped/replaced, or violates the
+page/sink/bit-width/boost/lifecycle invariants used by Qwen3-8B.
+
 The first complete A100 endpoint check (one warmup and one measured run) found
 the following maximum successful batches. The Kitty endpoint provides the
 paper's 8x batch-size gain and reaches 5.03x the local HF Dynamic FP16

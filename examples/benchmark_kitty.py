@@ -275,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
         reference_src = Path(__file__).resolve().parents[1] / "reference" / "code" / "Kitty" / "src"
         if str(reference_src) not in sys.path:
             sys.path.insert(0, str(reference_src))
-        from kitty.models.qwen3 import Qwen3ForCausalLM_Kitty
+        from dart.kitty_kernels import Qwen3ForCausalLM_Kitty
         from transformers import AutoConfig
 
         model_config = AutoConfig.from_pretrained(model_path, local_files_only=True)

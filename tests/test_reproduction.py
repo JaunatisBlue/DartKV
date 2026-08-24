@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from examples.check_kitty_reproduction import DEFAULT_MANIFEST, audit
+from examples.check_kitty_operator_parity import audit as audit_operator_parity
 from examples.reproduce_kitty import (
     _resolved_variant,
     _stop_words,
@@ -352,3 +353,10 @@ def test_direct_kitty_operator_facade_exposes_authoritative_kernels():
     assert kitty_kernels.KITTY_OPERATOR_IMPLEMENTATION.startswith("Kitty")
     for name in ("qk_kernel", "sv_kernel", "quantize_pack_k", "quantize_pack_v", "get_kvcache_kitty"):
         assert callable(getattr(kitty_kernels, name))
+
+
+def test_native_kitty_operator_audit_passes():
+    report = audit_operator_parity()
+    assert report["passed"]
+    assert all(item["same_object"] for item in report["symbols"].values())
+    assert all(report["invariants"].values())

@@ -35,6 +35,7 @@ from kitty.kvcache.kernels.kitty_quant_pack import (  # noqa: E402
 )
 from kitty.kvcache.kitty import KittyCache, get_kvcache_kitty  # noqa: E402
 from kitty.kvcache.utils_kv_per_layer import KVCache_Layer  # noqa: E402
+from kitty.models.qwen3 import Qwen3ForCausalLM_Kitty  # noqa: E402
 
 
 KITTY_OPERATOR_SOURCE = "reference/code/Kitty/src/kitty/kvcache"
@@ -45,6 +46,7 @@ __all__ = [
     "KITTY_OPERATOR_IMPLEMENTATION",
     "KVCache_Layer",
     "KittyCache",
+    "Qwen3ForCausalLM_Kitty",
     "get_kvcache_kitty",
     "kitty_attention_forward",
     "qk_kernel",

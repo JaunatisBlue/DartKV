@@ -148,6 +148,7 @@
     "prompt_conflict": "paper states prompts around 100 tokens; checked-in latency default prompt_choice=1 is 1179 tokens after the Qwen3 chat template",
     "native_operator_source": "reference/code/Kitty/src/kitty/kvcache via dart.kitty_kernels",
     "native_operator_kernel_set": ["quantize_pack_k", "quantize_pack_v", "qk_kernel", "sv_kernel"],
+    "native_operator_audit": "experiments/kitty_operator_audit.json",
     "reported_claims": {"batch_size_gain": "8x", "throughput_gain": "2.1x-4.1x"},
     "local_reproduction": "experiments/kitty_figure5_reproduction.json"
   }
