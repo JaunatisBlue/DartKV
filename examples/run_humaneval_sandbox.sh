@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="/home/yx/DartKV"
-results_dir="${1:-results/kitty_qwen8_paper_b1}"
+results_dir="${1:-results/kitty_qwen8_paper_b16}"
 device="${2:-cuda:0}"
 variant="${3:-kitty-pro}"
 datasets_cache="/home/yx/.cache/dartkv/humaneval_hf_datasets"
