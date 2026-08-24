@@ -185,10 +185,22 @@
       "kv_compression_ratio": 5.388587403387601,
       "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b256_l8192.json"
     },
+    "batch128": {
+      "sequence_tokens_per_second": 1366.4232155876375,
+      "generated_tokens_per_second": 1349.743244694234,
+      "peak_memory_allocated_bytes": 46457814528,
+      "peak_memory_reserved_bytes": 47112519680,
+      "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b128_l8192.json"
+    },
     "batch_size_gain": 8.0,
     "generated_throughput_gain": 2.8294007770196625,
     "paper_throughput_range": [2.1, 4.1],
-    "throughput_within_paper_range": true
+    "throughput_within_paper_range": true,
+    "batch512_boundary": {
+      "status": "oom",
+      "stage": "static KV-cache allocation",
+      "error": "CUDA out of memory while allocating the Kitty KeyCache"
+    }
   },
   "notes": [
     "The checked-in Kitty artifact prompt has 1179 tokens after the Qwen chat template; paper mode trims it to the paper's approximately 100-token protocol.",
