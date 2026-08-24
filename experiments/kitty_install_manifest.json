@@ -37,10 +37,11 @@
   },
   "checks": {
     "pip_check": "passed",
-    "pytest": "45 passed",
+    "pytest": "46 passed",
     "kitty_engine_import": "passed",
     "hqq_cuda_generation": "passed",
     "static_cache_cuda_generation": "passed",
-    "dart_qwen3_8b_fused_decode_smoke": "passed"
+    "dart_qwen3_8b_fused_decode_smoke": "passed",
+    "direct_kitty_operator_facade": "passed"
   }
 }

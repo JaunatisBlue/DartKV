@@ -272,6 +272,12 @@ selected Transformers backend and one-token decode consumes Dart packed pages
 through the fused Triton attention path. This is the implementation-under-test;
 `--cache kitty-engine` remains the checked-in Kitty reference engine.
 
+For the paper-faithful system path, `dart.kitty_kernels` exposes Kitty's exact
+MIT Triton `quantize_pack_k/v`, `qk_kernel`, `sv_kernel`, and page allocator from
+`reference/code/Kitty/src/kitty/kvcache`; the facade is used by the
+`kitty-engine` benchmark so the measured system path does not silently switch
+to Dart's generic reference kernels.
+
 The first complete A100 endpoint check (one warmup and one measured run) found
 the following maximum successful batches. The Kitty endpoint provides the
 paper's 8x batch-size gain and reaches 5.03x the local HF Dynamic FP16

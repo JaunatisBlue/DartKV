@@ -722,6 +722,25 @@ def fused_dart_attention(
     running_max = torch.full((batch, query.shape[1]), -torch.inf, dtype=torch.float32, device=query.device)
     running_sum = torch.zeros_like(running_max)
     running_output = torch.zeros((batch, query.shape[1], head_dim), dtype=torch.float32, device=query.device)
+
+    # The Qwen decode adapter appends one token before every call, which
+    # invalidates descriptor caches by design.  Consume the current packed
+    # segments directly in that hot path instead of rebuilding page metadata
+    # and uniform runs for every token.  Explicit page_table/page_runs callers
+    # retain the page-major batching path below.
+    if page_table is None and page_runs is None:
+        for key_segment, value_segment in segments:
+            _launch_fused_page(
+                query,
+                key_segment,
+                value_segment,
+                running_max,
+                running_sum,
+                running_output,
+                scale=factor,
+            )
+        return (running_output / running_sum.clamp_min(1e-20).unsqueeze(-1)).unsqueeze(2).to(query.dtype)
+
     page_index = 0
     while page_index < len(segments):
         run = run_by_start.get(page_index)

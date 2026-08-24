@@ -343,3 +343,12 @@ def test_tiny_qwen3_dart_engine_generation_cpu():
         )
     assert output.shape == (1, 33)
     assert cache.get_seq_length() == 32
+
+
+def test_direct_kitty_operator_facade_exposes_authoritative_kernels():
+    from dart import kitty_kernels
+
+    assert kitty_kernels.KITTY_OPERATOR_SOURCE.endswith("kitty/kvcache")
+    assert kitty_kernels.KITTY_OPERATOR_IMPLEMENTATION.startswith("Kitty")
+    for name in ("qk_kernel", "sv_kernel", "quantize_pack_k", "quantize_pack_v", "get_kvcache_kitty"):
+        assert callable(getattr(kitty_kernels, name))

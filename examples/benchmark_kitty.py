@@ -242,10 +242,7 @@ def _new_cache(args: argparse.Namespace, model_config):
 
 
 def _new_engine_cache(args: argparse.Namespace, model_config):
-    reference_src = Path(__file__).resolve().parents[1] / "reference" / "code" / "Kitty" / "src"
-    if str(reference_src) not in sys.path:
-        sys.path.insert(0, str(reference_src))
-    from kitty.kvcache import get_kvcache_kitty
+    from dart.kitty_kernels import get_kvcache_kitty
 
     return get_kvcache_kitty(model_config, args.batch_size, args.max_seq_len)
 
