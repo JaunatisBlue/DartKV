@@ -307,6 +307,11 @@ The plot defaults to a consistent peak-allocated memory series. Passing
 reserved memory; it never mixes allocated fallbacks into the same line. The
 adjacent summary JSON retains both fields for audit.
 
+The complete local package/build audit is tracked in
+`experiments/kitty_install_manifest.json`; it includes FlashAttention and
+Quanto `sm80` build validation, the math extras required by Kitty's MATH/AIME
+tasks, and the latest test/`pip check` status.
+
 For a bounded kernel/launch breakdown, profile a short decode window. The
 default writes only a compact aggregate table; add `--profile-trace` only when
 a potentially gigabyte-scale Chrome trace is needed:

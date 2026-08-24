@@ -1,0 +1,45 @@
+{
+  "environment": "dartkv",
+  "validated_at": "2026-08-24",
+  "python": "3.10.20",
+  "gpu": "NVIDIA A100 80GB PCIe",
+  "cuda_runtime": "12.6",
+  "host_nvcc": "12.9",
+  "packages": {
+    "torch": "2.7.1+cu126",
+    "transformers": "4.53.2",
+    "triton": "3.3.1",
+    "flash-attn": "2.7.4.post1",
+    "kitty": "1.0.0",
+    "ninja": "1.13.0",
+    "einops": "0.8.2",
+    "hqq": "0.2.8.post1",
+    "optimum-quanto": "0.2.7",
+    "lm-eval": "0.4.12",
+    "antlr4-python3-runtime": "4.11.0",
+    "latex2sympy2-extended": "1.11.0",
+    "math-verify": "0.9.0",
+    "matplotlib": "3.10.9",
+    "seaborn": "0.13.2"
+  },
+  "builds": {
+    "flash-attn": {
+      "status": "validated",
+      "cuda_arch": "sm80",
+      "api_test": "flash_attn_func CUDA forward and Kitty Qwen3 FA2 prefill passed"
+    },
+    "quanto_cuda": {
+      "status": "validated",
+      "cuda_arch": "sm80",
+      "artifact": "/home/yx/miniconda3/envs/dartkv/lib/python3.10/site-packages/optimum/quanto/library/extensions/cuda/build/quanto_cuda.so",
+      "api_test": "QuantoQuantizedCache CUDA generation passed"
+    }
+  },
+  "checks": {
+    "pip_check": "passed",
+    "pytest": "42 passed",
+    "kitty_engine_import": "passed",
+    "hqq_cuda_generation": "passed",
+    "static_cache_cuda_generation": "passed"
+  }
+}
