@@ -124,6 +124,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Official local GPQA-Diamond CSV prepared by examples/prepare_gpqa.py",
     )
     parser.add_argument("--confirm-run-unsafe-code", action="store_true")
+    parser.add_argument(
+        "--request-checkpoint",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Atomically checkpoint batch-1 stochastic responses and RNG states",
+    )
     return parser
 
 
@@ -434,8 +440,26 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
             print(f"checkpoint: {repeat_path}")
             continue
         random_seed = args.random_seed + repeat
+        evaluation_lm = lm
+        request_checkpoint = None
+        if args.request_checkpoint:
+            if args.batch_size != 1:
+                raise ValueError("request-checkpoint requires batch-size=1")
+            from dart.eval_checkpoint import ExactSamplingCheckpointLM
+
+            request_checkpoint = (
+                _result_base(args, model_path)
+                / args.task
+                / run_name
+                / f"repeat_{repeat}_requests.pt"
+            )
+            evaluation_lm = ExactSamplingCheckpointLM(
+                lm,
+                request_checkpoint,
+                {**experiment_signature, "repeat": repeat},
+            )
         result = simple_evaluate(
-            model=lm,
+            model=evaluation_lm,
             tasks=task_spec,
             num_fewshot=_task_fewshot(args.task),
             batch_size=args.batch_size,
@@ -477,6 +501,8 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
             "results": _jsonable(result.get("results", {})),
             "samples": _jsonable(result.get("samples", {})),
         }, ensure_ascii=False, indent=2) + "\n")
+        if request_checkpoint is not None:
+            evaluation_lm.discard()
     peak_memory = torch.cuda.max_memory_allocated(device) if device.type == "cuda" else None
     output = {
         "variant": variant,

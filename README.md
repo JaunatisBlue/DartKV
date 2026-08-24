@@ -224,6 +224,14 @@ consumption and is a different accuracy protocol, not merely a speed setting.
 The Qwen3-8B completion audit rejects summaries with another batch size, fewer
 than three repeats, or the wrong generation limit.
 
+Batch-1 stochastic runs also enable exact request checkpoints by default.
+After every completed request, the runner atomically stores the response plus
+Python/NumPy/Torch/CUDA RNG states under the repeat directory. Resume verifies
+that cached requests are a strict prefix of lm-eval's own request order before
+restoring RNG and generating the remainder. This is distinct from lm-eval's
+ordinary response cache, which intentionally cannot resume sampled requests.
+Pass `--no-request-checkpoint` only when this protection is not wanted.
+
 HumanEval executes model-generated Python. Run that cell with network disabled
 and the repository read-only (except its result directory):
 

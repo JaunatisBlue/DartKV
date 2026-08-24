@@ -494,3 +494,81 @@ def test_humaneval_sandbox_is_offline_and_uses_disposable_caches():
     assert "HF_METRICS_CACHE=/tmp/hf_metrics" in script
     assert "HF_DATASETS_OFFLINE=1" in script
     assert "humaneval_hf_datasets" in script
+
+
+def test_exact_sampling_checkpoint_restores_all_rng_states(tmp_path):
+    import random
+    from types import SimpleNamespace
+
+    import numpy as np
+    import torch
+
+    from dart.eval_checkpoint import ExactSamplingCheckpointLM
+
+    class Hook:
+        def add_partial(self, attr, req, response):
+            pass
+
+    class FakeLM:
+        batch_size = 1
+
+        def __init__(self, fail_after=None):
+            self.cache_hook = Hook()
+            self.fail_after = fail_after
+            self.completed = 0
+
+        def set_cache_hook(self, hook):
+            self.cache_hook = hook
+
+        def tok_encode(self, text):
+            return list(text.encode())
+
+        def generate_until(self, requests):
+            ordered = sorted(
+                requests,
+                key=lambda request: (-len(self.tok_encode(request.args[0])), request.args[0]),
+            )
+            generated = {}
+            for request in ordered:
+                value = (
+                    random.random(),
+                    float(np.random.random()),
+                    float(torch.rand(())),
+                )
+                generated[request.args[0]] = value
+                self.cache_hook.add_partial("generate_until", request.args, value)
+                self.completed += 1
+                if self.fail_after is not None and self.completed == self.fail_after:
+                    raise RuntimeError("simulated interruption")
+            return [generated[request.args[0]] for request in requests]
+
+    requests = [
+        SimpleNamespace(args=(text, {"do_sample": True, "temperature": 0.6}))
+        for text in ("a", "longest", "middle")
+    ]
+    signature = {"task": "test", "batch_size": 1}
+
+    random.seed(7)
+    np.random.seed(8)
+    torch.manual_seed(9)
+    baseline = ExactSamplingCheckpointLM(
+        FakeLM(), tmp_path / "baseline.pt", signature
+    ).generate_until(requests)
+
+    random.seed(7)
+    np.random.seed(8)
+    torch.manual_seed(9)
+    interrupted_path = tmp_path / "interrupted.pt"
+    interrupted = ExactSamplingCheckpointLM(
+        FakeLM(fail_after=2), interrupted_path, signature
+    )
+    with pytest.raises(RuntimeError, match="simulated interruption"):
+        interrupted.generate_until(requests)
+
+    random.seed(100)
+    np.random.seed(101)
+    torch.manual_seed(102)
+    resumed = ExactSamplingCheckpointLM(
+        FakeLM(), interrupted_path, signature
+    ).generate_until(requests)
+    assert resumed == baseline
