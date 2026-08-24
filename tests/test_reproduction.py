@@ -7,6 +7,7 @@ import pytest
 
 from examples.check_kitty_reproduction import DEFAULT_MANIFEST, audit
 from examples.check_kitty_operator_parity import audit as audit_operator_parity
+from examples.check_qwen3_8b_reproduction import figure4_expected_paths
 from examples.reproduce_kitty import (
     _resolved_variant,
     _stop_words,
@@ -360,3 +361,12 @@ def test_native_kitty_operator_audit_passes():
     assert report["passed"]
     assert all(item["same_object"] for item in report["symbols"].values())
     assert all(report["invariants"].values())
+
+
+def test_qwen3_8b_completion_audit_expects_all_figure4_cells(tmp_path):
+    manifest = json.loads(DEFAULT_MANIFEST.read_text())
+    paths = figure4_expected_paths(tmp_path, manifest)
+    assert len(paths) == 44
+    assert len(set(paths)) == 44
+    assert any("random" in str(path) for path in paths)
+    assert any("magnitude" in str(path) for path in paths)

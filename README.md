@@ -217,6 +217,16 @@ python examples/check_kitty_reproduction.py \
   --protocol paper --backend kitty-reference
 ```
 
+For the final Qwen3-8B-only completion gate (operator identity, native Figure
+5, all Table 3/4 cells, and all 44 Figure 4 points), run:
+
+```bash
+python examples/check_qwen3_8b_reproduction.py
+```
+
+It writes `experiments/qwen3_8b_reproduction_status.json` and returns success
+only when every Qwen3-8B deliverable is present and within the paper tolerance.
+
 Figure 4's 11-point random/magnitude promotion sweep is resumable through:
 
 ```bash
