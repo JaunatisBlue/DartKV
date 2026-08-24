@@ -37,7 +37,7 @@
   },
   "checks": {
     "pip_check": "passed",
-    "pytest": "52 passed",
+    "pytest": "53 passed",
     "kitty_engine_import": "passed",
     "hqq_cuda_generation": "passed",
     "static_cache_cuda_generation": "passed",

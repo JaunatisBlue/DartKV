@@ -410,6 +410,8 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
     lm = HFLM(pretrained=model, batch_size=args.batch_size)
     gen_kwargs = _generation_kwargs(args, cache, model_path)
     task_lower = args.task.lower()
+    if "humaneval" in task_lower and args.confirm_run_unsafe_code:
+        os.environ["HF_ALLOW_CODE_EVAL"] = "1"
     task_spec, local_task_data = _task_spec(args)
     result = None
     repeat_results: list[dict[str, Any]] = []
@@ -446,7 +448,7 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
             numpy_random_seed=args.numpy_seed + repeat,
             torch_random_seed=args.torch_seed + repeat,
             fewshot_random_seed=args.fewshot_seed + repeat,
-            confirm_run_unsafe_code=args.confirm_run_unsafe_code or "humaneval" in task_lower,
+            confirm_run_unsafe_code=args.confirm_run_unsafe_code,
         )
         if result is None:
             raise RuntimeError("lm-eval returned no result on the local rank")

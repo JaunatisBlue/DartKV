@@ -477,3 +477,11 @@ def test_lm_eval_clones_kitty_cache_between_accuracy_requests():
     cloned.update(states, states, 0)
     assert cloned.get_seq_length() == 3
     assert original.get_seq_length() == 0
+
+
+def test_humaneval_requires_explicit_unsafe_code_confirmation():
+    args = build_reproduction_parser().parse_args([
+        "--model", "/opt/model/Qwen/Qwen-8B",
+        "--task", "humaneval_instruct",
+    ])
+    assert args.confirm_run_unsafe_code is False

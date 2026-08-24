@@ -224,6 +224,18 @@ consumption and is a different accuracy protocol, not merely a speed setting.
 The Qwen3-8B completion audit rejects summaries with another batch size, fewer
 than three repeats, or the wrong generation limit.
 
+HumanEval executes model-generated Python. Run that cell with network disabled
+and the repository read-only (except its result directory):
+
+```bash
+bash examples/run_humaneval_sandbox.sh \
+  results/kitty_qwen8_paper_b1 cuda:0 kitty-pro
+```
+
+The normal runner no longer auto-confirms unsafe code; HumanEval requires the
+explicit sandbox wrapper or `--confirm-run-unsafe-code` plus
+`HF_ALLOW_CODE_EVAL=1`.
+
 The target cells, environment, known artifact conflicts, and Figure 4/5 setup
 are recorded in `experiments/kitty_paper_manifest.json`. Audit completed full
 results against the paper's reported maximum-deviation ranges with:
