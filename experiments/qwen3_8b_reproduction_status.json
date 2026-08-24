@@ -33,7 +33,7 @@
         "delta_points": null,
         "tolerance_points": 0.71,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/fp16_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/fp16_summary.json"
       },
       {
         "variant": "fp16",
@@ -45,7 +45,7 @@
         "delta_points": null,
         "tolerance_points": 0.45,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/minerva_math_algebra/fp16_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/fp16_summary.json"
       },
       {
         "variant": "fp16",
@@ -57,7 +57,7 @@
         "delta_points": null,
         "tolerance_points": 3.72,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/humaneval_instruct/fp16_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/fp16_summary.json"
       },
       {
         "variant": "fp16",
@@ -69,7 +69,7 @@
         "delta_points": null,
         "tolerance_points": 2.96,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/fp16_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/fp16_summary.json"
       },
       {
         "variant": "kivi-2",
@@ -81,7 +81,7 @@
         "delta_points": null,
         "tolerance_points": 0.51,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kivi-2_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kivi-2_summary.json"
       },
       {
         "variant": "kivi-2",
@@ -93,7 +93,7 @@
         "delta_points": null,
         "tolerance_points": 0.2,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kivi-2_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kivi-2_summary.json"
       },
       {
         "variant": "kivi-2",
@@ -105,7 +105,7 @@
         "delta_points": null,
         "tolerance_points": 3.11,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/humaneval_instruct/kivi-2_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kivi-2_summary.json"
       },
       {
         "variant": "kivi-2",
@@ -117,7 +117,7 @@
         "delta_points": null,
         "tolerance_points": 3.16,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kivi-2_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kivi-2_summary.json"
       },
       {
         "variant": "kivi-2-sink",
@@ -129,7 +129,7 @@
         "delta_points": null,
         "tolerance_points": 0.63,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kivi-2-sink_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kivi-2-sink_summary.json"
       },
       {
         "variant": "kivi-2-sink",
@@ -141,7 +141,7 @@
         "delta_points": null,
         "tolerance_points": 1.83,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kivi-2-sink_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kivi-2-sink_summary.json"
       },
       {
         "variant": "kivi-2-sink",
@@ -153,7 +153,7 @@
         "delta_points": null,
         "tolerance_points": 2.56,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/humaneval_instruct/kivi-2-sink_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kivi-2-sink_summary.json"
       },
       {
         "variant": "kivi-2-sink",
@@ -165,7 +165,7 @@
         "delta_points": null,
         "tolerance_points": 3.27,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kivi-2-sink_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kivi-2-sink_summary.json"
       },
       {
         "variant": "kitty",
@@ -177,7 +177,7 @@
         "delta_points": null,
         "tolerance_points": 0.58,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty_summary.json"
       },
       {
         "variant": "kitty",
@@ -189,7 +189,7 @@
         "delta_points": null,
         "tolerance_points": 1.54,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty_summary.json"
       },
       {
         "variant": "kitty",
@@ -201,7 +201,7 @@
         "delta_points": null,
         "tolerance_points": 1.89,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/humaneval_instruct/kitty_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kitty_summary.json"
       },
       {
         "variant": "kitty",
@@ -213,7 +213,7 @@
         "delta_points": null,
         "tolerance_points": 4.18,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kitty_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kitty_summary.json"
       },
       {
         "variant": "kitty-pro",
@@ -225,7 +225,7 @@
         "delta_points": null,
         "tolerance_points": 0.48,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro_summary.json"
       },
       {
         "variant": "kitty-pro",
@@ -237,7 +237,7 @@
         "delta_points": null,
         "tolerance_points": 1.26,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro_summary.json"
       },
       {
         "variant": "kitty-pro",
@@ -249,7 +249,7 @@
         "delta_points": null,
         "tolerance_points": 3.41,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/humaneval_instruct/kitty-pro_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kitty-pro_summary.json"
       },
       {
         "variant": "kitty-pro",
@@ -261,7 +261,7 @@
         "delta_points": null,
         "tolerance_points": 5.0,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kitty-pro_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kitty-pro_summary.json"
       }
     ]
   },
@@ -284,7 +284,7 @@
         "delta_points": null,
         "tolerance_points": 15.0,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/aime24/fp16_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime24/fp16_summary.json"
       },
       {
         "variant": "fp16",
@@ -296,7 +296,7 @@
         "delta_points": null,
         "tolerance_points": 7.33,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/aime25/fp16_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/fp16_summary.json"
       },
       {
         "variant": "kivi-2",
@@ -308,7 +308,7 @@
         "delta_points": null,
         "tolerance_points": 7.0,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/aime24/kivi-2_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime24/kivi-2_summary.json"
       },
       {
         "variant": "kivi-2",
@@ -320,7 +320,7 @@
         "delta_points": null,
         "tolerance_points": 9.0,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/aime25/kivi-2_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/kivi-2_summary.json"
       },
       {
         "variant": "kivi-2-sink",
@@ -332,7 +332,7 @@
         "delta_points": null,
         "tolerance_points": 9.0,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/aime24/kivi-2-sink_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime24/kivi-2-sink_summary.json"
       },
       {
         "variant": "kivi-2-sink",
@@ -344,7 +344,7 @@
         "delta_points": null,
         "tolerance_points": 9.0,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/aime25/kivi-2-sink_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/kivi-2-sink_summary.json"
       },
       {
         "variant": "kitty",
@@ -356,7 +356,7 @@
         "delta_points": null,
         "tolerance_points": 7.33,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/aime24/kitty_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime24/kitty_summary.json"
       },
       {
         "variant": "kitty",
@@ -368,7 +368,7 @@
         "delta_points": null,
         "tolerance_points": 10.33,
         "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b1/paper/kitty-reference/Qwen-8B/aime25/kitty_summary.json"
+        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/kitty_summary.json"
       }
     ]
   },

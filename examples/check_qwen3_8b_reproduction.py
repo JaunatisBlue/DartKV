@@ -21,7 +21,7 @@ DEFAULT_FIGURE5 = REPO_ROOT / "experiments" / "kitty_figure5_reproduction.json"
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--accuracy-results", type=Path, default=Path("results/kitty_qwen8_paper_b1"))
+    parser.add_argument("--accuracy-results", type=Path, default=Path("results/kitty_qwen8_paper_b16"))
     parser.add_argument("--figure4-results", type=Path, default=Path("results/kitty_sweep"))
     parser.add_argument("--operator-audit", type=Path, default=DEFAULT_OPERATOR_AUDIT)
     parser.add_argument("--figure5", type=Path, default=DEFAULT_FIGURE5)
@@ -97,7 +97,7 @@ def accuracy_signature_issues(table_report: dict, table_name: str) -> list[dict]
             "model_name": "Qwen-8B",
             "backend": "kitty-reference",
             "protocol": "paper",
-            "batch_size": 1,
+            "batch_size": 16,
             "limit": None,
             "max_new_tokens": expected_max_new_tokens,
             "minimum_repeats": 3,

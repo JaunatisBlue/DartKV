@@ -18,6 +18,7 @@ from typing import Any, Iterable
 
 import numpy as np
 import torch
+from lm_eval.api.model import LM
 
 
 def _stable(value: Any) -> Any:
@@ -66,13 +67,19 @@ class _CheckpointHook:
             self.owner._record(req, res)
 
 
-class ExactSamplingCheckpointLM:
+class ExactSamplingCheckpointLM(LM):
     """Proxy an lm-eval LM while checkpointing stochastic batch-1 requests."""
 
     def __init__(self, lm, checkpoint: Path, signature: dict[str, Any]) -> None:
-        if getattr(lm, "batch_size", None) != 1:
-            raise ValueError("exact sampling checkpoints currently require lm-eval batch_size=1")
+        super().__init__()
+        batch_size = getattr(lm, "batch_size", None)
+        if not isinstance(batch_size, int) or batch_size <= 0:
+            raise ValueError("exact sampling checkpoints require a fixed positive batch size")
         self.lm = lm
+        self._rank = lm.rank
+        self._world_size = lm.world_size
+        self._device = lm.device
+        self.batch_size = batch_size
         self.checkpoint = checkpoint
         self.signature = _stable(signature)
         self.state = {
@@ -94,6 +101,22 @@ class ExactSamplingCheckpointLM:
     def __getattr__(self, name: str):
         return getattr(self.lm, name)
 
+    def loglikelihood(self, requests):
+        return self.lm.loglikelihood(requests)
+
+    def loglikelihood_rolling(self, requests):
+        return self.lm.loglikelihood_rolling(requests)
+
+    def apply_chat_template(self, chat_history, add_generation_prompt=True):
+        return self.lm.apply_chat_template(chat_history, add_generation_prompt)
+
+    @property
+    def tokenizer_name(self) -> str:
+        return self.lm.tokenizer_name
+
+    def chat_template(self, chat_template: bool | str = False):
+        return self.lm.chat_template(chat_template)
+
     def _ordered(self, requests) -> list:
         # Reuse lm-eval's own grouping/sorting implementation so cache object
         # identity and group insertion order match HFLM exactly.
@@ -108,7 +131,7 @@ class ExactSamplingCheckpointLM:
             group_by="gen_kwargs",
             group_fn=lambda request: request.args[1],
         )
-        return [request for chunk in collator.get_batched(n=1) for request in chunk]
+        return [request for chunk in collator.get_batched(n=self.batch_size) for request in chunk]
 
     def generate_until(self, requests):
         ordered = self._ordered(requests)
@@ -118,6 +141,8 @@ class ExactSamplingCheckpointLM:
         completed = self.state["sequence"]
         if ordered_hashes[: len(completed)] != completed:
             raise RuntimeError("sampling checkpoint is not a prefix of the current request order")
+        if len(completed) % self.batch_size and len(completed) != len(ordered_hashes):
+            raise RuntimeError("sampling checkpoint prefix does not end at a batch boundary")
 
         responses = self.state["responses"]
         remaining = [request for request in requests if _request_hash(request.args) not in responses]
@@ -143,7 +168,11 @@ class ExactSamplingCheckpointLM:
         self.state["sequence"].append(request_hash)
         self.state["responses"][request_hash] = response
         self.state["rng_after"] = _rng_state()
-        self._save()
+        completed_this_run = len(self.state["sequence"]) - self._record_base
+        at_batch_boundary = completed_this_run % self.batch_size == 0
+        at_final_request = len(self.state["sequence"]) == self._record_base + len(self._expected_remaining)
+        if at_batch_boundary or at_final_request:
+            self._save()
 
     def _save(self) -> None:
         self.checkpoint.parent.mkdir(parents=True, exist_ok=True)

@@ -32,7 +32,7 @@ exec bwrap \
     --backend kitty-reference \
     --protocol paper \
     --device "${device}" \
-    --batch-size 1 \
+    --batch-size 16 \
     --repeats 3 \
     --max-new-tokens 4096 \
     --confirm-run-unsafe-code \

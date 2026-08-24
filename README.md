@@ -206,7 +206,7 @@ python examples/reproduce_kitty.py \
   --model /opt/model/Qwen/Qwen-8B \
   --task gsm8k_cot_llama --variant kitty-pro \
   --backend kitty-reference --protocol paper \
-  --device cuda:0 --dtype fp16 --batch-size 1 \
+  --device cuda:0 --dtype fp16 --batch-size 16 \
   --repeats 3 --max-new-tokens 4096
 ```
 
@@ -218,16 +218,18 @@ the task YAML control sampling. This distinction is intentional: the paper and
 artifact disagree on both fields. Use `--limit 1` for a smoke run; limited runs
 are isolated under `smoke_limit_1` and cannot be mistaken for full results.
 
-Accuracy reproduction uses `--batch-size 1`, the default in Kitty's
-`accuracy_eval.sh`. With stochastic sampling, changing batch size changes RNG
-consumption and is a different accuracy protocol, not merely a speed setting.
-The Qwen3-8B completion audit rejects summaries with another batch size, fewer
-than three repeats, or the wrong generation limit.
+The paper does not fix an accuracy batch size; Kitty's `accuracy_eval.sh`
+exposes it as an explicit argument. Local A100 reproduction uses batch 16 to
+complete the full matrix while retaining the paper's sampling distribution,
+seeds, and 3-repeat aggregation. Batching changes the exact RNG draw sequence,
+so the selected value is recorded and the Qwen3-8B completion audit rejects
+summaries with another batch size, fewer than three repeats, or the wrong
+generation limit.
 
-Batch-1 stochastic runs also enable exact request checkpoints by default.
-After every completed request, the runner atomically stores the response plus
+Stochastic runs also enable exact batch-boundary checkpoints by default.
+After every completed batch, the runner atomically stores responses plus
 Python/NumPy/Torch/CUDA RNG states under the repeat directory. Resume verifies
-that cached requests are a strict prefix of lm-eval's own request order before
+that cached requests are a strict chunk-aligned prefix of lm-eval's own request order before
 restoring RNG and generating the remainder. This is distinct from lm-eval's
 ordinary response cache, which intentionally cannot resume sampled requests.
 Pass `--no-request-checkpoint` only when this protection is not wanted.

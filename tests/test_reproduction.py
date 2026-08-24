@@ -377,7 +377,7 @@ def test_qwen3_8b_completion_audit_expects_all_figure4_cells(tmp_path):
     assert any("magnitude" in str(path) for path in paths)
 
 
-def test_qwen3_8b_completion_audit_rejects_accuracy_batch16(tmp_path):
+def test_qwen3_8b_completion_audit_rejects_accuracy_batch1(tmp_path):
     summary = tmp_path / "summary.json"
     summary.write_text(json.dumps({
         "repeats": 3,
@@ -385,15 +385,15 @@ def test_qwen3_8b_completion_audit_rejects_accuracy_batch16(tmp_path):
             "model": "/opt/model/Qwen/Qwen-8B",
             "backend": "kitty-reference",
             "protocol": "paper",
-            "batch_size": 16,
+            "batch_size": 1,
             "limit": None,
             "max_new_tokens": 4096,
         },
     }))
     report = {"cells": [{"summary_path": str(summary), "task": "gsm8k_cot_llama"}]}
     issues = accuracy_signature_issues(report, "table3")
-    assert issues[0]["expected"]["batch_size"] == 1
-    assert issues[0]["actual"]["batch_size"] == 16
+    assert issues[0]["expected"]["batch_size"] == 16
+    assert issues[0]["actual"]["batch_size"] == 1
 
 
 def test_local_gpqa_task_uses_official_csv_shape(tmp_path):
@@ -510,9 +510,11 @@ def test_exact_sampling_checkpoint_restores_all_rng_states(tmp_path):
             pass
 
     class FakeLM:
-        batch_size = 1
-
-        def __init__(self, fail_after=None):
+        def __init__(self, batch_size=2, fail_after=None):
+            self.batch_size = batch_size
+            self.rank = 0
+            self.world_size = 1
+            self.device = torch.device("cpu")
             self.cache_hook = Hook()
             self.fail_after = fail_after
             self.completed = 0
@@ -560,7 +562,7 @@ def test_exact_sampling_checkpoint_restores_all_rng_states(tmp_path):
     torch.manual_seed(9)
     interrupted_path = tmp_path / "interrupted.pt"
     interrupted = ExactSamplingCheckpointLM(
-        FakeLM(fail_after=2), interrupted_path, signature
+        FakeLM(fail_after=3), interrupted_path, signature
     )
     with pytest.raises(RuntimeError, match="simulated interruption"):
         interrupted.generate_until(requests)

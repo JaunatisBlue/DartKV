@@ -128,7 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--request-checkpoint",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Atomically checkpoint batch-1 stochastic responses and RNG states",
+        help="Atomically checkpoint stochastic response batches and RNG states",
     )
     return parser
 
@@ -443,8 +443,6 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
         evaluation_lm = lm
         request_checkpoint = None
         if args.request_checkpoint:
-            if args.batch_size != 1:
-                raise ValueError("request-checkpoint requires batch-size=1")
             from dart.eval_checkpoint import ExactSamplingCheckpointLM
 
             request_checkpoint = (
