@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import importlib.metadata
 import json
+import os
 import platform
 import sys
 from pathlib import Path
@@ -112,6 +114,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--torch-seed", type=int, default=1234)
     parser.add_argument("--fewshot-seed", type=int, default=1234)
     parser.add_argument("--output", default="results/kitty_repro")
+    parser.add_argument(
+        "--gpqa-data",
+        type=Path,
+        default=Path(os.environ.get(
+            "DARTKV_GPQA_DATA",
+            "/home/yx/.cache/dartkv/gpqa/dataset/gpqa_diamond.csv",
+        )),
+        help="Official local GPQA-Diamond CSV prepared by examples/prepare_gpqa.py",
+    )
     parser.add_argument("--confirm-run-unsafe-code", action="store_true")
     return parser
 
@@ -269,7 +280,7 @@ def _experiment_signature(
 ) -> dict[str, Any]:
     """Fields that must agree before an existing repeat can be resumed."""
 
-    return {
+    signature = {
         "model": str(Path(args.model).expanduser()),
         "task": args.task,
         "variant": variant,
@@ -293,6 +304,42 @@ def _experiment_signature(
             "fewshot": args.fewshot_seed,
         },
     }
+    if args.task == "gpqa_diamond_cot_n_shot":
+        signature["gpqa_data"] = str(args.gpqa_data)
+        signature["gpqa_data_sha256"] = (
+            hashlib.sha256(args.gpqa_data.read_bytes()).hexdigest()
+            if args.gpqa_data.is_file()
+            else None
+        )
+    return signature
+
+
+def _task_spec(args: argparse.Namespace):
+    """Use the official local CSV when the gated GPQA Hub dataset is unavailable."""
+
+    if args.task != "gpqa_diamond_cot_n_shot":
+        return [args.task], None
+    if not args.gpqa_data.is_file():
+        raise FileNotFoundError(
+            f"missing GPQA-Diamond data: {args.gpqa_data}; "
+            "run `python examples/prepare_gpqa.py`"
+        )
+    import lm_eval
+    from lm_eval.tasks._yaml_loader import load_yaml
+
+    yaml_path = (
+        Path(lm_eval.__file__).resolve().parent
+        / "tasks" / "gpqa" / "cot_n_shot" / "gpqa_diamond_cot_n_shot.yaml"
+    )
+    config = load_yaml(yaml_path, resolve_func=True, recursive=True)
+    config["dataset_path"] = "csv"
+    config.pop("dataset_name", None)
+    config["dataset_kwargs"] = {"data_files": {"train": str(args.gpqa_data)}}
+    metadata = {
+        "path": str(args.gpqa_data),
+        "sha256": hashlib.sha256(args.gpqa_data.read_bytes()).hexdigest(),
+    }
+    return [config], metadata
 
 
 def _result_base(args: argparse.Namespace, model_path: Path) -> Path:
@@ -363,6 +410,7 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
     lm = HFLM(pretrained=model, batch_size=args.batch_size)
     gen_kwargs = _generation_kwargs(args, cache, model_path)
     task_lower = args.task.lower()
+    task_spec, local_task_data = _task_spec(args)
     result = None
     repeat_results: list[dict[str, Any]] = []
     for repeat in range(args.repeats):
@@ -386,7 +434,7 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
         random_seed = args.random_seed + repeat
         result = simple_evaluate(
             model=lm,
-            tasks=[args.task],
+            tasks=task_spec,
             num_fewshot=_task_fewshot(args.task),
             batch_size=args.batch_size,
             limit=args.limit,
@@ -421,8 +469,9 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
             },
             "model": str(model_path),
             "task": args.task,
-            "config": vars(args),
+            "config": _jsonable(vars(args)),
             "cache_config": _jsonable(cache_config.__dict__) if cache_config is not None else None,
+            "local_task_data": local_task_data,
             "results": _jsonable(result.get("results", {})),
             "samples": _jsonable(result.get("samples", {})),
         }, ensure_ascii=False, indent=2) + "\n")
@@ -458,6 +507,7 @@ def run_variant(args: argparse.Namespace, variant: str) -> dict[str, Any]:
         "results": _jsonable(result.get("results", {})),
         "repeat_statistics": _summarize_repeats(repeat_results),
         "cache_config": _jsonable(cache_config.__dict__) if cache_config is not None else None,
+        "local_task_data": local_task_data,
     }
     del lm, model, cache
     gc.collect()

@@ -37,12 +37,21 @@
   },
   "checks": {
     "pip_check": "passed",
-    "pytest": "50 passed",
+    "pytest": "52 passed",
     "kitty_engine_import": "passed",
     "hqq_cuda_generation": "passed",
     "static_cache_cuda_generation": "passed",
     "dart_qwen3_8b_fused_decode_smoke": "passed",
     "direct_kitty_operator_facade": "passed",
     "operator_identity_and_source_hash_audit": "experiments/kitty_operator_audit.json"
+  },
+  "datasets": {
+    "gpqa_diamond": {
+      "source": "https://raw.githubusercontent.com/idavidrein/gpqa/main/dataset.zip",
+      "archive_sha256": "461ae7329f15a3e35f8184d2dac24b990f34fdf12f366ca4062d8e6638cd08dc",
+      "csv_sha256": "41d1213cd7a4998605a26c2798500652572007161b3a92817ba46b35befcd305",
+      "rows": 198,
+      "local_path": "/home/yx/.cache/dartkv/gpqa/dataset/gpqa_diamond.csv"
+    }
   }
 }

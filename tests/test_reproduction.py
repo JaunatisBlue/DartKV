@@ -15,6 +15,8 @@ from examples.reproduce_kitty import (
     _resolved_variant,
     _stop_words,
     _summarize_repeats,
+    _task_spec,
+    build_parser as build_reproduction_parser,
 )
 from examples.benchmark_kitty import (
     _kitty_prompt,
@@ -388,10 +390,65 @@ def test_qwen3_8b_completion_audit_rejects_accuracy_batch16(tmp_path):
             "max_new_tokens": 4096,
         },
     }))
-    report = {"cells": [{"summary_path": str(summary)}]}
+    report = {"cells": [{"summary_path": str(summary), "task": "gsm8k_cot_llama"}]}
     issues = accuracy_signature_issues(report, "table3")
     assert issues[0]["expected"]["batch_size"] == 1
     assert issues[0]["actual"]["batch_size"] == 16
+
+
+def test_local_gpqa_task_uses_official_csv_shape(tmp_path):
+    import csv
+    from lm_eval.tasks import TaskManager
+
+    data = tmp_path / "gpqa_diamond.csv"
+    columns = [
+        "Question",
+        "Correct Answer",
+        "Incorrect Answer 1",
+        "Incorrect Answer 2",
+        "Incorrect Answer 3",
+    ]
+    with data.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        writer.writerow({
+            "Question": "Test question?",
+            "Correct Answer": "Correct",
+            "Incorrect Answer 1": "Wrong 1",
+            "Incorrect Answer 2": "Wrong 2",
+            "Incorrect Answer 3": "Wrong 3",
+        })
+    args = build_reproduction_parser().parse_args([
+        "--model", "/opt/model/Qwen/Qwen-8B",
+        "--task", "gpqa_diamond_cot_n_shot",
+        "--gpqa-data", str(data),
+    ])
+    task_spec, metadata = _task_spec(args)
+    task = TaskManager().load(task_spec)["tasks"]["gpqa_diamond_cot_n_shot"]
+    assert len(task.eval_docs) == 1
+    assert metadata["path"] == str(data)
+
+
+def test_qwen3_8b_completion_audit_rejects_wrong_gpqa_hash(tmp_path):
+    summary = tmp_path / "summary.json"
+    summary.write_text(json.dumps({
+        "repeats": 3,
+        "experiment_signature": {
+            "model": "/opt/model/Qwen/Qwen-8B",
+            "backend": "kitty-reference",
+            "protocol": "paper",
+            "batch_size": 1,
+            "limit": None,
+            "max_new_tokens": 4096,
+            "gpqa_data_sha256": "wrong",
+        },
+    }))
+    report = {"cells": [{
+        "summary_path": str(summary),
+        "task": "gpqa_diamond_cot_n_shot",
+    }]}
+    issues = accuracy_signature_issues(report, "table3")
+    assert issues[0]["expected"]["gpqa_data_sha256"].startswith("41d121")
 
 
 def test_lm_eval_clones_kitty_cache_between_accuracy_requests():

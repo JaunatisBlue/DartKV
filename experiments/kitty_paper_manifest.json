@@ -47,7 +47,14 @@
     "gsm8k_cot_llama": {"paper_name": "GSM8K", "fewshot": 8, "metric": "exact_match,strict-match"},
     "minerva_math_algebra": {"paper_name": "MATH-Algebra", "fewshot": 4, "metric": "exact_match,none"},
     "humaneval_instruct": {"paper_name": "HumanEval", "fewshot": 0, "metric": "pass@1,create_test"},
-    "gpqa_diamond_cot_n_shot": {"paper_name": "GPQA-Diamond", "fewshot": 5, "metric": "exact_match,none"},
+    "gpqa_diamond_cot_n_shot": {
+      "paper_name": "GPQA-Diamond",
+      "fewshot": 5,
+      "metric": "exact_match,none",
+      "official_local_source": "https://raw.githubusercontent.com/idavidrein/gpqa/main/dataset.zip",
+      "diamond_csv_sha256": "41d1213cd7a4998605a26c2798500652572007161b3a92817ba46b35befcd305",
+      "rows": 198
+    },
     "aime24": {"paper_name": "AIME24", "fewshot": 0, "metric": "exact_match,none", "max_new_tokens": 32768},
     "aime25": {"paper_name": "AIME25", "fewshot": 0, "metric": "exact_match,none", "max_new_tokens": 32768}
   },

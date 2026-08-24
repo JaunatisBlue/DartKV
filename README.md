@@ -40,6 +40,17 @@ The standard-task smoke evaluator is optional and can be installed with
 `python -m pip install -r requirements-eval.txt`; it is not needed for the
 PyTorch cache or Qwen generation runner.
 
+GPQA is gated on Hugging Face. Prepare the identical official GPQA release
+from the authors' GitHub repository before Table 3:
+
+```bash
+python examples/prepare_gpqa.py
+```
+
+The preparer validates the official archive hash, Diamond CSV hash, and the
+198-row count. `reproduce_kitty.py` automatically uses this local CSV for
+`gpqa_diamond_cot_n_shot`, while retaining lm-eval's prompt/filter/metric.
+
 For the Kitty paper/system path, install the checked-in Kitty package and its
 optional evaluation tools:
 

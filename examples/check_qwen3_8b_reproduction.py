@@ -13,6 +13,7 @@ except ModuleNotFoundError:  # direct ``python examples/...py`` execution
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+GPQA_DIAMOND_SHA256 = "41d1213cd7a4998605a26c2798500652572007161b3a92817ba46b35befcd305"
 DEFAULT_OPERATOR_AUDIT = REPO_ROOT / "experiments" / "kitty_operator_audit.json"
 DEFAULT_FIGURE5 = REPO_ROOT / "experiments" / "kitty_figure5_reproduction.json"
 
@@ -110,6 +111,9 @@ def accuracy_signature_issues(table_report: dict, table_name: str) -> list[dict]
             "max_new_tokens": signature.get("max_new_tokens"),
             "repeats": summary.get("repeats"),
         }
+        if cell["task"] == "gpqa_diamond_cot_n_shot":
+            expected["gpqa_data_sha256"] = GPQA_DIAMOND_SHA256
+            actual["gpqa_data_sha256"] = signature.get("gpqa_data_sha256")
         valid = (
             actual["model_name"] == expected["model_name"]
             and actual["backend"] == expected["backend"]
@@ -119,6 +123,7 @@ def accuracy_signature_issues(table_report: dict, table_name: str) -> list[dict]
             and actual["max_new_tokens"] == expected["max_new_tokens"]
             and isinstance(actual["repeats"], int)
             and actual["repeats"] >= expected["minimum_repeats"]
+            and actual.get("gpqa_data_sha256") == expected.get("gpqa_data_sha256")
         )
         if not valid:
             issues.append({"summary_path": summary_path, "expected": expected, "actual": actual})
