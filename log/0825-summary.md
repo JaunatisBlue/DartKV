@@ -19,6 +19,7 @@
 - Kitty-Pro/GSM8K 已完整落盘三次，strict-match 分别为 93.6315%、93.9348%、94.6929%，均值 94.0864%；相对论文 94.34% 相差 -0.2536 个百分点，Table 3 该 cell 状态为 `matched`。在当前“每配置一次”范围下，该配置已经满足要求。
 - Kitty-Pro/GPQA-Diamond 已完成 198 个样本，官方 CSV 哈希与签名通过；flexible-extract 准确率 37.8788%，相对论文 40.92±5.00% 的差值为 -3.0412 个百分点，cell 状态为 `matched`。
 - Kitty-Pro/HumanEval 已在离线 bubblewrap 沙箱完成 164 个样本，pass@1=78.0488%，相对论文 81.34±3.41% 的差值为 -3.2912 个百分点，cell 状态为 `matched`。
+- Kitty/HumanEval 已在相同离线沙箱完成 164 个样本，pass@1=82.3171%，相对论文 81.77±1.89% 的差值为 +0.5471 个百分点，cell 状态为 `matched`。
 
 ## 去重后的运行时间线
 
@@ -33,7 +34,7 @@
 
 ## 当前门禁与剩余工作
 
-总复现尚未完成。按最终必做清单，最新审计状态为：operator audit 与 Figure 5 已通过；Table 3 为 matched 3、missing 2；Table 4 missing 2；Figure 4 不要求。排除项不计入缺项。
+总复现尚未完成。按最终必做清单，最新审计状态为：operator audit 与 Figure 5 已通过；Table 3 为 matched 4、missing 1；Table 4 missing 2；Figure 4 不要求。排除项不计入缺项。
 
 后续按能够最快释放结果的顺序推进：
 
