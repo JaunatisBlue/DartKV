@@ -17,6 +17,7 @@
 - 精确采样 checkpoint 已支持 batch16 批边界原子保存、请求顺序/签名校验及 Python、NumPy、Torch、CUDA RNG 恢复，可从完整批边界续跑。
 - Figure 5 的原生 Kitty kernel 结果已通过门禁：A100 80GB 上最大成功 batch 为 256，FP16 最大 batch 为 32，batch-size gain 为 8×；Kitty batch32→256 的生成吞吐增益为 2.8294×，位于论文 2.1×–4.1× 范围内；batch512 在静态 Kitty KV-cache 分配阶段 OOM。GPU 利用率百分数和 `power.draw` 瓦数已分开记录。
 - Kitty-Pro/GSM8K 已完整落盘三次，strict-match 分别为 93.6315%、93.9348%、94.6929%，均值 94.0864%；相对论文 94.34% 相差 -0.2536 个百分点，Table 3 该 cell 状态为 `matched`。在当前“每配置一次”范围下，该配置已经满足要求。
+- Kitty-Pro/GPQA-Diamond 已完成 198 个样本，官方 CSV 哈希与签名通过；flexible-extract 准确率 37.8788%，相对论文 40.92±5.00% 的差值为 -3.0412 个百分点，cell 状态为 `matched`。
 
 ## 去重后的运行时间线
 
@@ -31,7 +32,7 @@
 
 ## 当前门禁与剩余工作
 
-总复现尚未完成。按最终必做清单，最新审计状态为：operator audit 与 Figure 5 已通过；Table 3 为 matched 1、missing 4；Table 4 missing 2；Figure 4 不要求。排除项不计入缺项。
+总复现尚未完成。按最终必做清单，最新审计状态为：operator audit 与 Figure 5 已通过；Table 3 为 matched 2、missing 3；Table 4 missing 2；Figure 4 不要求。排除项不计入缺项。
 
 后续按能够最快释放结果的顺序推进：
 

@@ -30,9 +30,9 @@
   "table3": {
     "passed": false,
     "counts": {
-      "matched": 1,
+      "matched": 2,
       "outside_tolerance": 0,
-      "missing": 4
+      "missing": 3
     },
     "signature_issues": [],
     "incomplete_cells": [
@@ -71,18 +71,6 @@
         "tolerance_points": 3.41,
         "status": "missing",
         "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kitty-pro_summary.json"
-      },
-      {
-        "variant": "kitty-pro",
-        "task": "gpqa_diamond_cot_n_shot",
-        "metric": "exact_match,none",
-        "target_percent": 40.92,
-        "paper_max_deviation": 5.0,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 5.0,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kitty-pro_summary.json"
       }
     ]
   },

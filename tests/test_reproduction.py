@@ -42,6 +42,13 @@ def test_manifest_averages_match_reported_tables():
                 assert sum(task_means) / len(task_means) == pytest.approx(targets["average"], abs=0.01)
 
 
+def test_gpqa_manifest_uses_lm_eval_flexible_extraction_metric():
+    manifest = json.loads(DEFAULT_MANIFEST.read_text())
+    assert manifest["tasks"]["gpqa_diamond_cot_n_shot"]["metric"] == (
+        "exact_match,flexible-extract"
+    )
+
+
 def test_protocol_resolves_paper_and_artifact_kitty_pro_ratios():
     common = {"promote_ratio": None, "channel_selection": None}
     paper = _resolved_variant(argparse.Namespace(protocol="paper", **common), "kitty-pro")
