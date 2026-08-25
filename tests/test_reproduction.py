@@ -448,12 +448,31 @@ def test_qwen3_8b_completion_audit_accepts_one_complete_repeat(tmp_path):
             "backend": "kitty-reference",
             "protocol": "paper",
             "batch_size": 16,
+            "attn_implementation": "auto",
             "limit": None,
             "max_new_tokens": 4096,
         },
     }))
     report = {"cells": [{"summary_path": str(summary), "task": "gsm8k_cot_llama"}]}
     assert accuracy_signature_issues(report, "table3") == []
+
+
+def test_qwen3_8b_table4_uses_memory_safe_flash_attention_protocol(tmp_path):
+    summary = tmp_path / "summary.json"
+    summary.write_text(json.dumps({
+        "repeats": 1,
+        "experiment_signature": {
+            "model": "/opt/model/Qwen/Qwen-8B",
+            "backend": "kitty-reference",
+            "protocol": "paper",
+            "batch_size": 8,
+            "attn_implementation": "flash_attention_2",
+            "limit": None,
+            "max_new_tokens": 32768,
+        },
+    }))
+    report = {"cells": [{"summary_path": str(summary), "task": "aime24"}]}
+    assert accuracy_signature_issues(report, "table4") == []
 
 
 def test_local_gpqa_task_uses_official_csv_shape(tmp_path):

@@ -269,6 +269,11 @@ only when every selected deliverable is present and within the paper tolerance.
 Figure 4, FP16/KIVI baselines, and Kitty base Table 3 cells other than HumanEval
 are explicitly outside this fast scope.
 
+Table 4 keeps the paper's 32768-token limit and uses batch 8 with
+`flash_attention_2` on the local A100. Batch 16 reached 80.9 GiB and OOMed
+before the first batch checkpoint; batch 8 is the formal memory-safe AIME
+protocol. The accuracy batch size is not fixed by the paper.
+
 Figure 4's 11-point random/magnitude promotion sweep is resumable through:
 
 ```bash

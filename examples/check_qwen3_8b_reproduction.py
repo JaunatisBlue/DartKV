@@ -104,11 +104,13 @@ def accuracy_signature_issues(table_report: dict, table_name: str) -> list[dict]
         checked.add(summary_path)
         summary = json.loads(Path(summary_path).read_text())
         signature = summary.get("experiment_signature", {})
+        is_table4 = table_name == "table4"
         expected = {
             "model_name": "Qwen-8B",
             "backend": "kitty-reference",
             "protocol": "paper",
-            "batch_size": 16,
+            "batch_size": 8 if is_table4 else 16,
+            "attn_implementation": "flash_attention_2" if is_table4 else "auto",
             "limit": None,
             "max_new_tokens": expected_max_new_tokens,
             "minimum_repeats": 1,
@@ -118,6 +120,7 @@ def accuracy_signature_issues(table_report: dict, table_name: str) -> list[dict]
             "backend": signature.get("backend"),
             "protocol": signature.get("protocol"),
             "batch_size": signature.get("batch_size"),
+            "attn_implementation": signature.get("attn_implementation"),
             "limit": signature.get("limit"),
             "max_new_tokens": signature.get("max_new_tokens"),
             "repeats": summary.get("repeats"),
@@ -130,6 +133,7 @@ def accuracy_signature_issues(table_report: dict, table_name: str) -> list[dict]
             and actual["backend"] == expected["backend"]
             and actual["protocol"] == expected["protocol"]
             and actual["batch_size"] == expected["batch_size"]
+            and actual["attn_implementation"] == expected["attn_implementation"]
             and actual["limit"] is None
             and actual["max_new_tokens"] == expected["max_new_tokens"]
             and isinstance(actual["repeats"], int)

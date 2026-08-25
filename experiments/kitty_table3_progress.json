@@ -6,12 +6,12 @@
   "results_base": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B",
   "criterion": "absolute delta <= the paper's reported maximum deviation for each cell",
   "counts": {
-    "matched": 4,
+    "matched": 5,
     "outside_tolerance": 0,
-    "missing": 1
+    "missing": 0
   },
-  "complete": false,
-  "reproduced": false,
+  "complete": true,
+  "reproduced": true,
   "cells": [
     {
       "variant": "kitty",
@@ -43,10 +43,10 @@
       "metric": "exact_match,none",
       "target_percent": 88.12,
       "paper_max_deviation": 1.26,
-      "observed_percent": null,
-      "delta_points": null,
+      "observed_percent": 88.2055602358888,
+      "delta_points": 0.08556023588879214,
       "tolerance_points": 1.26,
-      "status": "missing",
+      "status": "matched",
       "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro_summary.json"
     },
     {
