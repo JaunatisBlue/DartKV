@@ -28,6 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only audit these method variants (for example: kitty kitty-pro)",
     )
     parser.add_argument(
+        "--cells",
+        nargs="+",
+        default=None,
+        help="Only audit exact variant:task cells; takes precedence over broad table scope",
+    )
+    parser.add_argument(
         "--absolute-tolerance",
         type=float,
         default=None,
@@ -54,11 +60,14 @@ def audit(args: argparse.Namespace) -> dict[str, Any]:
     tasks = manifest["tasks"]
     base_dir = args.results / args.protocol / args.backend / args.model_dir
     cells: list[dict[str, Any]] = []
+    required_cells = set(getattr(args, "cells", None) or ())
     for variant, variant_targets in targets.items():
         if getattr(args, "variants", None) and variant not in args.variants:
             continue
         for task, target in variant_targets.items():
             if task == "average":
+                continue
+            if required_cells and f"{variant}:{task}" not in required_cells:
                 continue
             target_mean, paper_max_deviation = target
             metric = tasks[task]["metric"]

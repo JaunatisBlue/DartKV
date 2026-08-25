@@ -1,10 +1,11 @@
 # 08 月 25 日工作汇总：聚焦 Qwen3-8B Kitty 方法的单次完整复现
 
-时间范围：2026-08-25 00:30–09:29（Asia/Shanghai）
+时间范围：2026-08-25 00:30–10:55（Asia/Shanghai）
 
 ## 关键决策
 
 - 正式范围只保留 Qwen3-8B 上的 Kitty/Kitty-Pro 方法；FP16、KIVI 等 baseline 已停止，其已有结果仅作为诊断数据，不计入复现门禁。
+- 最新必做准确率 cell 进一步收缩为：Kitty-Pro 的 GSM8K、MATH-Algebra、GPQA-Diamond、HumanEval，Kitty 的 HumanEval、AIME24、AIME25。Figure 4 的 44 个配置和 Kitty 基础配置在 Table 3 的 GSM8K/MATH/GPQA 明确排除。
 - 准确率实验的 `repeat` 是同一配置更换随机种子后重新跑完整数据集。为尽快复现 Kitty，当前每个配置只要求一次完整实验；此前已经完成的 Kitty-Pro/GSM8K 三次结果继续保留，但不再要求其他配置重复三次。
 - 正式准确率协议保持 `kitty-reference`、paper sampling、batch size 16、完整数据集；Table 3 默认 `max_new_tokens=4096`，Table 4 的 AIME24/25 使用 `max_new_tokens=32768`。
 - 实验前提仍是先确保 Kitty 代码和算子完整搬运。当前入口直接使用 Kitty 原始 Triton attention、K/V quant-pack、cache、per-layer cache 和 Qwen3 模型对象，不以 DartKV 同义实现替代。
@@ -26,19 +27,19 @@
 - 09:15：正式切换到“只看 Kitty 方法、baseline 排除、每配置一次完整实验”；FP16/GSM8K 被停止，不再继续消耗 GPU。
 - 09:20：GPU0 启动 Kitty-Pro/GPQA-Diamond 单次完整实验。
 - 09:29 快照：GPU1 的 Kitty-Pro/MATH-Algebra 正在运行，exact checkpoint 为 96/1187；GPU0 的 Kitty-Pro/GPQA-Diamond 正在运行，尚未写出首个完整 batch checkpoint。两进程均为 `--repeats 1`，当时 GPU0/GPU1 显存约 38.6/64.8 GiB，利用率 98%/97%，`power.draw` 约 311/305 W。
+- 10:55：最终必做清单排除 Figure 4 与 Kitty 基础配置的其他 Table 3 任务；MATH/Kitty-Pro 为 288/1187，GPQA/Kitty-Pro 为 144/198。
 
 ## 当前门禁与剩余工作
 
-总复现尚未完成。最新审计状态为：operator audit 与 Figure 5 已通过；Table 3 为 matched 1、missing 7；Table 4 missing 2；Figure 4 completed 0/44。baseline 不在这些缺项中。
+总复现尚未完成。按最终必做清单，最新审计状态为：operator audit 与 Figure 5 已通过；Table 3 为 matched 1、missing 4；Table 4 missing 2；Figure 4 不要求。排除项不计入缺项。
 
 后续按能够最快释放结果的顺序推进：
 
 1. 完成当前 Kitty-Pro/MATH-Algebra 与 Kitty-Pro/GPQA-Diamond，各只跑一次完整数据集，落盘后立即检查实验签名、样本数和论文容差。
-2. 补齐 Table 3 的 Kitty/Kitty-Pro 方法 cell：Kitty 的 GSM8K、MATH-Algebra、HumanEval、GPQA-Diamond，以及尚缺的 Kitty-Pro HumanEval；当前正在运行的 Kitty-Pro MATH 和 GPQA 完成后即可消除另外两项缺失。
-3. 在离线 bubblewrap 沙箱中分别完成 Kitty 与 Kitty-Pro HumanEval 单次实验；不复跑 FP16/KIVI。
-4. 完成 Table 4 的 Kitty/AIME24 与 Kitty/AIME25 单次实验，保持 32768 token 上限。
-5. 完成 Figure 4 的 44 个 Kitty-Pro 配置：GSM8K 与 MATH-Algebra，各包含 random/magnitude 两种 channel selection 和 11 个 promotion ratio；每个配置只跑一次。
-6. 每完成一组就重新运行 Table 3 与 Qwen3-8B 总审计；全部缺项消除、签名与容差通过后，再执行 pytest、环境/工作区核对并宣称总复现完成。
+2. 在离线 bubblewrap 沙箱中分别完成 Kitty 与 Kitty-Pro HumanEval 单次实验；不复跑 FP16/KIVI。
+3. 完成 Table 4 的 Kitty/AIME24 与 Kitty/AIME25 单次实验，保持 32768 token 上限。
+4. 不运行 Figure 4，也不运行 Kitty 基础配置的 GSM8K/MATH/GPQA。
+5. 每完成一组就重新运行 Table 3 与 Qwen3-8B 总审计；全部必做缺项消除、签名与容差通过后，再执行 pytest、环境/工作区核对并宣称总复现完成。
 
 ## 核对依据
 

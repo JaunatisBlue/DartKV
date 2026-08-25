@@ -8,35 +8,11 @@
   "counts": {
     "matched": 1,
     "outside_tolerance": 0,
-    "missing": 7
+    "missing": 4
   },
   "complete": false,
   "reproduced": false,
   "cells": [
-    {
-      "variant": "kitty",
-      "task": "gsm8k_cot_llama",
-      "metric": "exact_match,strict-match",
-      "target_percent": 93.61,
-      "paper_max_deviation": 0.58,
-      "observed_percent": null,
-      "delta_points": null,
-      "tolerance_points": 0.58,
-      "status": "missing",
-      "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty_summary.json"
-    },
-    {
-      "variant": "kitty",
-      "task": "minerva_math_algebra",
-      "metric": "exact_match,none",
-      "target_percent": 85.12,
-      "paper_max_deviation": 1.54,
-      "observed_percent": null,
-      "delta_points": null,
-      "tolerance_points": 1.54,
-      "status": "missing",
-      "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty_summary.json"
-    },
     {
       "variant": "kitty",
       "task": "humaneval_instruct",
@@ -48,18 +24,6 @@
       "tolerance_points": 1.89,
       "status": "missing",
       "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kitty_summary.json"
-    },
-    {
-      "variant": "kitty",
-      "task": "gpqa_diamond_cot_n_shot",
-      "metric": "exact_match,none",
-      "target_percent": 39.39,
-      "paper_max_deviation": 4.18,
-      "observed_percent": null,
-      "delta_points": null,
-      "tolerance_points": 4.18,
-      "status": "missing",
-      "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kitty_summary.json"
     },
     {
       "variant": "kitty-pro",

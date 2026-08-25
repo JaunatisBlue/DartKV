@@ -257,16 +257,17 @@ python examples/check_kitty_reproduction.py \
   --protocol paper --backend kitty-reference
 ```
 
-For the final method-focused Qwen3-8B completion gate (operator identity,
-native Figure 5, Kitty/Kitty-Pro Table 3 cells, Kitty Table 4 cells, and all 44
-Figure 4 points), run:
+For the final fast Qwen3-8B completion gate (operator identity, native Figure
+5, the selected Kitty/Kitty-Pro Table 3 cells, and Kitty Table 4 cells), run:
 
 ```bash
 python examples/check_qwen3_8b_reproduction.py
 ```
 
 It writes `experiments/qwen3_8b_reproduction_status.json` and returns success
-only when every Qwen3-8B deliverable is present and within the paper tolerance.
+only when every selected deliverable is present and within the paper tolerance.
+Figure 4, FP16/KIVI baselines, and Kitty base Table 3 cells other than HumanEval
+are explicitly outside this fast scope.
 
 Figure 4's 11-point random/magnitude promotion sweep is resumable through:
 

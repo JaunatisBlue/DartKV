@@ -1,12 +1,16 @@
 {
-  "scope": "Qwen3-8B Kitty methods only; baselines excluded; one complete repeat minimum",
-  "required_accuracy_variants": {
+  "scope": "user-selected Qwen3-8B Kitty cells; one complete repeat minimum",
+  "required_accuracy_cells": {
     "table3": [
-      "kitty",
-      "kitty-pro"
+      "kitty:humaneval_instruct",
+      "kitty-pro:gsm8k_cot_llama",
+      "kitty-pro:minerva_math_algebra",
+      "kitty-pro:humaneval_instruct",
+      "kitty-pro:gpqa_diamond_cot_n_shot"
     ],
     "table4": [
-      "kitty"
+      "kitty:aime24",
+      "kitty:aime25"
     ]
   },
   "passed": false,
@@ -28,34 +32,10 @@
     "counts": {
       "matched": 1,
       "outside_tolerance": 0,
-      "missing": 7
+      "missing": 4
     },
     "signature_issues": [],
     "incomplete_cells": [
-      {
-        "variant": "kitty",
-        "task": "gsm8k_cot_llama",
-        "metric": "exact_match,strict-match",
-        "target_percent": 93.61,
-        "paper_max_deviation": 0.58,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 0.58,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty_summary.json"
-      },
-      {
-        "variant": "kitty",
-        "task": "minerva_math_algebra",
-        "metric": "exact_match,none",
-        "target_percent": 85.12,
-        "paper_max_deviation": 1.54,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 1.54,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty_summary.json"
-      },
       {
         "variant": "kitty",
         "task": "humaneval_instruct",
@@ -67,18 +47,6 @@
         "tolerance_points": 1.89,
         "status": "missing",
         "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kitty_summary.json"
-      },
-      {
-        "variant": "kitty",
-        "task": "gpqa_diamond_cot_n_shot",
-        "metric": "exact_match,none",
-        "target_percent": 39.39,
-        "paper_max_deviation": 4.18,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 4.18,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kitty_summary.json"
       },
       {
         "variant": "kitty-pro",
@@ -154,54 +122,7 @@
     ]
   },
   "figure4": {
-    "passed": false,
-    "expected": 44,
-    "completed": 0,
-    "missing": [
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_0_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_1_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_2_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_3_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_4_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_5_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_6_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_7_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_8_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr0_9_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__random__pr1_0_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_0_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_1_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_2_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_3_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_4_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_5_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_6_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_7_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_8_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr0_9_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro__magnitude__pr1_0_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_0_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_1_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_2_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_3_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_4_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_5_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_6_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_7_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_8_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr0_9_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__random__pr1_0_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_0_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_1_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_2_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_3_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_4_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_5_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_6_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_7_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_8_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr0_9_summary.json",
-      "results/kitty_sweep/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro__magnitude__pr1_0_summary.json"
-    ]
+    "required": false,
+    "reason": "excluded from the user-selected fast reproduction scope"
   }
 }

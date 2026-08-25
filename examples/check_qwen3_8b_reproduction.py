@@ -16,6 +16,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 GPQA_DIAMOND_SHA256 = "41d1213cd7a4998605a26c2798500652572007161b3a92817ba46b35befcd305"
 DEFAULT_OPERATOR_AUDIT = REPO_ROOT / "experiments" / "kitty_operator_audit.json"
 DEFAULT_FIGURE5 = REPO_ROOT / "experiments" / "kitty_figure5_reproduction.json"
+REQUIRED_TABLE3_CELLS = (
+    "kitty:humaneval_instruct",
+    "kitty-pro:gsm8k_cot_llama",
+    "kitty-pro:minerva_math_algebra",
+    "kitty-pro:humaneval_instruct",
+    "kitty-pro:gpqa_diamond_cot_n_shot",
+)
+REQUIRED_TABLE4_CELLS = (
+    "kitty:aime24",
+    "kitty:aime25",
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -141,25 +152,20 @@ def check(args: argparse.Namespace) -> dict:
         "backend": "kitty-reference",
         "absolute_tolerance": None,
     }
-    # The method-focused reproduction intentionally excludes FP16/KIVI
-    # baselines. Table 3 contains both proposed variants; Table 4 reports
-    # Kitty (12.5% boosted channels) only.
+    # The user-selected fast scope intentionally excludes FP16/KIVI, Figure 4,
+    # and Kitty base cells other than HumanEval.
     table3 = audit_table(argparse.Namespace(
-        table="table3", variants=["kitty", "kitty-pro"], **common_table_args
+        table="table3", variants=None, cells=REQUIRED_TABLE3_CELLS, **common_table_args
     ))
     table4 = audit_table(argparse.Namespace(
-        table="table4", variants=["kitty"], **common_table_args
+        table="table4", variants=None, cells=REQUIRED_TABLE4_CELLS, **common_table_args
     ))
     table3_signature_issues = accuracy_signature_issues(table3, "table3")
     table4_signature_issues = accuracy_signature_issues(table4, "table4")
 
-    expected_figure4 = figure4_expected_paths(args.figure4_results, manifest)
-    missing_figure4 = [str(path) for path in expected_figure4 if not path.is_file()]
     figure4 = {
-        "passed": not missing_figure4,
-        "expected": len(expected_figure4),
-        "completed": len(expected_figure4) - len(missing_figure4),
-        "missing": missing_figure4,
+        "required": False,
+        "reason": "excluded from the user-selected fast reproduction scope",
     }
 
     operator = (
@@ -173,13 +179,12 @@ def check(args: argparse.Namespace) -> dict:
         figure5["passed"],
         table3["reproduced"] and not table3_signature_issues,
         table4["reproduced"] and not table4_signature_issues,
-        figure4["passed"],
     ))
     return {
-        "scope": "Qwen3-8B Kitty methods only; baselines excluded; one complete repeat minimum",
-        "required_accuracy_variants": {
-            "table3": ["kitty", "kitty-pro"],
-            "table4": ["kitty"],
+        "scope": "user-selected Qwen3-8B Kitty cells; one complete repeat minimum",
+        "required_accuracy_cells": {
+            "table3": list(REQUIRED_TABLE3_CELLS),
+            "table4": list(REQUIRED_TABLE4_CELLS),
         },
         "passed": passed,
         "operator_audit": {

@@ -324,6 +324,25 @@ def test_method_focused_audit_excludes_baseline_rows(tmp_path):
     assert report["counts"]["missing"] == 8
 
 
+def test_audit_can_select_exact_variant_task_cells(tmp_path):
+    report = audit(argparse.Namespace(
+        manifest=DEFAULT_MANIFEST,
+        results=tmp_path,
+        table="table3",
+        model_key="Qwen3-8B",
+        model_dir="Qwen-8B",
+        protocol="paper",
+        backend="kitty-reference",
+        variants=None,
+        cells=["kitty:humaneval_instruct", "kitty-pro:gsm8k_cot_llama"],
+        absolute_tolerance=None,
+    ))
+    assert [(cell["variant"], cell["task"]) for cell in report["cells"]] == [
+        ("kitty", "humaneval_instruct"),
+        ("kitty-pro", "gsm8k_cot_llama"),
+    ]
+
+
 def test_tiny_qwen3_dart_engine_generation_cpu():
     import torch
     from transformers import Qwen3Config, Qwen3ForCausalLM
