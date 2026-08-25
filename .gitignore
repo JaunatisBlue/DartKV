@@ -10,3 +10,5 @@ checkpoints/
 HF_HOME/
 *.sif
 *.img
+experiments/
+reference/
