@@ -307,6 +307,23 @@ def test_audit_reads_summary_and_marks_remaining_cells_missing(tmp_path):
     assert not report["reproduced"]
 
 
+def test_method_focused_audit_excludes_baseline_rows(tmp_path):
+    report = audit(argparse.Namespace(
+        manifest=DEFAULT_MANIFEST,
+        results=tmp_path,
+        table="table3",
+        model_key="Qwen3-8B",
+        model_dir="Qwen-8B",
+        protocol="paper",
+        backend="kitty-reference",
+        variants=["kitty", "kitty-pro"],
+        absolute_tolerance=None,
+    ))
+    assert len(report["cells"]) == 8
+    assert {cell["variant"] for cell in report["cells"]} == {"kitty", "kitty-pro"}
+    assert report["counts"]["missing"] == 8
+
+
 def test_tiny_qwen3_dart_engine_generation_cpu():
     import torch
     from transformers import Qwen3Config, Qwen3ForCausalLM
@@ -394,6 +411,23 @@ def test_qwen3_8b_completion_audit_rejects_accuracy_batch1(tmp_path):
     issues = accuracy_signature_issues(report, "table3")
     assert issues[0]["expected"]["batch_size"] == 16
     assert issues[0]["actual"]["batch_size"] == 1
+
+
+def test_qwen3_8b_completion_audit_accepts_one_complete_repeat(tmp_path):
+    summary = tmp_path / "summary.json"
+    summary.write_text(json.dumps({
+        "repeats": 1,
+        "experiment_signature": {
+            "model": "/opt/model/Qwen/Qwen-8B",
+            "backend": "kitty-reference",
+            "protocol": "paper",
+            "batch_size": 16,
+            "limit": None,
+            "max_new_tokens": 4096,
+        },
+    }))
+    report = {"cells": [{"summary_path": str(summary), "task": "gsm8k_cot_llama"}]}
+    assert accuracy_signature_issues(report, "table3") == []
 
 
 def test_local_gpqa_task_uses_official_csv_shape(tmp_path):

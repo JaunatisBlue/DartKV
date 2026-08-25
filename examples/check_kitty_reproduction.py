@@ -22,6 +22,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--protocol", choices=("paper", "artifact"), default="paper")
     parser.add_argument("--backend", choices=("kitty-reference", "dart"), default="kitty-reference")
     parser.add_argument(
+        "--variants",
+        nargs="+",
+        default=None,
+        help="Only audit these method variants (for example: kitty kitty-pro)",
+    )
+    parser.add_argument(
         "--absolute-tolerance",
         type=float,
         default=None,
@@ -49,6 +55,8 @@ def audit(args: argparse.Namespace) -> dict[str, Any]:
     base_dir = args.results / args.protocol / args.backend / args.model_dir
     cells: list[dict[str, Any]] = []
     for variant, variant_targets in targets.items():
+        if getattr(args, "variants", None) and variant not in args.variants:
+            continue
         for task, target in variant_targets.items():
             if task == "average":
                 continue

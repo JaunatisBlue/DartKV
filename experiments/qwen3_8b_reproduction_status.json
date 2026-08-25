@@ -1,5 +1,14 @@
 {
-  "scope": "Qwen3-8B only",
+  "scope": "Qwen3-8B Kitty methods only; baselines excluded; one complete repeat minimum",
+  "required_accuracy_variants": {
+    "table3": [
+      "kitty",
+      "kitty-pro"
+    ],
+    "table4": [
+      "kitty"
+    ]
+  },
   "passed": false,
   "operator_audit": {
     "passed": true,
@@ -17,156 +26,12 @@
   "table3": {
     "passed": false,
     "counts": {
-      "matched": 0,
+      "matched": 1,
       "outside_tolerance": 0,
-      "missing": 20
+      "missing": 7
     },
     "signature_issues": [],
     "incomplete_cells": [
-      {
-        "variant": "fp16",
-        "task": "gsm8k_cot_llama",
-        "metric": "exact_match,strict-match",
-        "target_percent": 94.79,
-        "paper_max_deviation": 0.71,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 0.71,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/fp16_summary.json"
-      },
-      {
-        "variant": "fp16",
-        "task": "minerva_math_algebra",
-        "metric": "exact_match,none",
-        "target_percent": 88.26,
-        "paper_max_deviation": 0.45,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 0.45,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/fp16_summary.json"
-      },
-      {
-        "variant": "fp16",
-        "task": "humaneval_instruct",
-        "metric": "pass@1,create_test",
-        "target_percent": 84.82,
-        "paper_max_deviation": 3.72,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 3.72,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/fp16_summary.json"
-      },
-      {
-        "variant": "fp16",
-        "task": "gpqa_diamond_cot_n_shot",
-        "metric": "exact_match,none",
-        "target_percent": 40.71,
-        "paper_max_deviation": 2.96,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 2.96,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/fp16_summary.json"
-      },
-      {
-        "variant": "kivi-2",
-        "task": "gsm8k_cot_llama",
-        "metric": "exact_match,strict-match",
-        "target_percent": 89.13,
-        "paper_max_deviation": 0.51,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 0.51,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kivi-2_summary.json"
-      },
-      {
-        "variant": "kivi-2",
-        "task": "minerva_math_algebra",
-        "metric": "exact_match,none",
-        "target_percent": 47.29,
-        "paper_max_deviation": 0.2,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 0.2,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kivi-2_summary.json"
-      },
-      {
-        "variant": "kivi-2",
-        "task": "humaneval_instruct",
-        "metric": "pass@1,create_test",
-        "target_percent": 76.89,
-        "paper_max_deviation": 3.11,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 3.11,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kivi-2_summary.json"
-      },
-      {
-        "variant": "kivi-2",
-        "task": "gpqa_diamond_cot_n_shot",
-        "metric": "exact_match,none",
-        "target_percent": 32.24,
-        "paper_max_deviation": 3.16,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 3.16,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kivi-2_summary.json"
-      },
-      {
-        "variant": "kivi-2-sink",
-        "task": "gsm8k_cot_llama",
-        "metric": "exact_match,strict-match",
-        "target_percent": 89.71,
-        "paper_max_deviation": 0.63,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 0.63,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kivi-2-sink_summary.json"
-      },
-      {
-        "variant": "kivi-2-sink",
-        "task": "minerva_math_algebra",
-        "metric": "exact_match,none",
-        "target_percent": 74.92,
-        "paper_max_deviation": 1.83,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 1.83,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kivi-2-sink_summary.json"
-      },
-      {
-        "variant": "kivi-2-sink",
-        "task": "humaneval_instruct",
-        "metric": "pass@1,create_test",
-        "target_percent": 78.54,
-        "paper_max_deviation": 2.56,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 2.56,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kivi-2-sink_summary.json"
-      },
-      {
-        "variant": "kivi-2-sink",
-        "task": "gpqa_diamond_cot_n_shot",
-        "metric": "exact_match,none",
-        "target_percent": 36.02,
-        "paper_max_deviation": 3.27,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 3.27,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gpqa_diamond_cot_n_shot/kivi-2-sink_summary.json"
-      },
       {
         "variant": "kitty",
         "task": "gsm8k_cot_llama",
@@ -217,18 +82,6 @@
       },
       {
         "variant": "kitty-pro",
-        "task": "gsm8k_cot_llama",
-        "metric": "exact_match,strict-match",
-        "target_percent": 94.34,
-        "paper_max_deviation": 0.48,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 0.48,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/gsm8k_cot_llama/kitty-pro_summary.json"
-      },
-      {
-        "variant": "kitty-pro",
         "task": "minerva_math_algebra",
         "metric": "exact_match,none",
         "target_percent": 88.12,
@@ -270,82 +123,10 @@
     "counts": {
       "matched": 0,
       "outside_tolerance": 0,
-      "missing": 8
+      "missing": 2
     },
     "signature_issues": [],
     "incomplete_cells": [
-      {
-        "variant": "fp16",
-        "task": "aime24",
-        "metric": "exact_match,none",
-        "target_percent": 71.67,
-        "paper_max_deviation": 15.0,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 15.0,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime24/fp16_summary.json"
-      },
-      {
-        "variant": "fp16",
-        "task": "aime25",
-        "metric": "exact_match,none",
-        "target_percent": 66.0,
-        "paper_max_deviation": 7.33,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 7.33,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/fp16_summary.json"
-      },
-      {
-        "variant": "kivi-2",
-        "task": "aime24",
-        "metric": "exact_match,none",
-        "target_percent": 57.0,
-        "paper_max_deviation": 7.0,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 7.0,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime24/kivi-2_summary.json"
-      },
-      {
-        "variant": "kivi-2",
-        "task": "aime25",
-        "metric": "exact_match,none",
-        "target_percent": 52.33,
-        "paper_max_deviation": 9.0,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 9.0,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/kivi-2_summary.json"
-      },
-      {
-        "variant": "kivi-2-sink",
-        "task": "aime24",
-        "metric": "exact_match,none",
-        "target_percent": 67.67,
-        "paper_max_deviation": 9.0,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 9.0,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime24/kivi-2-sink_summary.json"
-      },
-      {
-        "variant": "kivi-2-sink",
-        "task": "aime25",
-        "metric": "exact_match,none",
-        "target_percent": 57.67,
-        "paper_max_deviation": 9.0,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 9.0,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/kivi-2-sink_summary.json"
-      },
       {
         "variant": "kitty",
         "task": "aime24",

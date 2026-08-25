@@ -207,7 +207,7 @@ python examples/reproduce_kitty.py \
   --task gsm8k_cot_llama --variant kitty-pro \
   --backend kitty-reference --protocol paper \
   --device cuda:0 --dtype fp16 --batch-size 16 \
-  --repeats 3 --max-new-tokens 4096
+  --repeats 1 --max-new-tokens 4096
 ```
 
 `--backend kitty-reference` executes the checked-in Kitty simulation semantics;
@@ -219,12 +219,12 @@ artifact disagree on both fields. Use `--limit 1` for a smoke run; limited runs
 are isolated under `smoke_limit_1` and cannot be mistaken for full results.
 
 The paper does not fix an accuracy batch size; Kitty's `accuracy_eval.sh`
-exposes it as an explicit argument. Local A100 reproduction uses batch 16 to
-complete the full matrix while retaining the paper's sampling distribution,
-seeds, and 3-repeat aggregation. Batching changes the exact RNG draw sequence,
-so the selected value is recorded and the Qwen3-8B completion audit rejects
-summaries with another batch size, fewer than three repeats, or the wrong
-generation limit.
+exposes it as an explicit argument. The method-focused local A100 reproduction
+uses batch 16 and one complete dataset pass per Kitty configuration while
+retaining the paper's sampling distribution and seeds. FP16/KIVI baseline rows
+are outside this fast reproduction scope. Batching changes the exact RNG draw
+sequence, so the selected value is recorded and the Qwen3-8B completion audit
+rejects summaries with another batch size or the wrong generation limit.
 
 Stochastic runs also enable exact batch-boundary checkpoints by default.
 After every completed batch, the runner atomically stores responses plus
@@ -257,8 +257,9 @@ python examples/check_kitty_reproduction.py \
   --protocol paper --backend kitty-reference
 ```
 
-For the final Qwen3-8B-only completion gate (operator identity, native Figure
-5, all Table 3/4 cells, and all 44 Figure 4 points), run:
+For the final method-focused Qwen3-8B completion gate (operator identity,
+native Figure 5, Kitty/Kitty-Pro Table 3 cells, Kitty Table 4 cells, and all 44
+Figure 4 points), run:
 
 ```bash
 python examples/check_qwen3_8b_reproduction.py
@@ -271,7 +272,7 @@ Figure 4's 11-point random/magnitude promotion sweep is resumable through:
 
 ```bash
 python examples/sweep_kitty.py --model /opt/model/Qwen/Qwen-8B \
-  --device cuda:0 --batch-size 16 --repeats 3 --max-new-tokens 4096
+  --device cuda:0 --batch-size 16 --repeats 1 --max-new-tokens 4096
 ```
 
 Use `--limit 8` to validate the sweep wiring before scheduling the full

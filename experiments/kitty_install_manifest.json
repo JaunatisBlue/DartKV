@@ -37,14 +37,14 @@
   },
   "checks": {
     "pip_check": "passed",
-    "pytest": "55 passed",
+    "pytest": "57 passed",
     "kitty_engine_import": "passed",
     "hqq_cuda_generation": "passed",
     "static_cache_cuda_generation": "passed",
     "dart_qwen3_8b_fused_decode_smoke": "passed",
     "direct_kitty_operator_facade": "passed",
     "operator_identity_and_source_hash_audit": "experiments/kitty_operator_audit.json",
-    "qwen3_8b_exact_sampling_checkpoint": "validated on FP16 repeat0 and Kitty-Pro repeat1, batch16"
+    "qwen3_8b_exact_sampling_checkpoint": "validated with fixed batch16 and exact RNG restore; method-focused experiments require one complete repeat"
   },
   "datasets": {
     "gpqa_diamond": {

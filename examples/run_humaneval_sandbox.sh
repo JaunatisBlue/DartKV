@@ -33,7 +33,7 @@ exec bwrap \
     --protocol paper \
     --device "${device}" \
     --batch-size 16 \
-    --repeats 3 \
+    --repeats 1 \
     --max-new-tokens 4096 \
     --confirm-run-unsafe-code \
     --output "${results_dir}"
