@@ -22,6 +22,7 @@
 - Kitty/HumanEval 已在相同离线沙箱完成 164 个样本，pass@1=82.3171%，相对论文 81.77±1.89% 的差值为 +0.5471 个百分点，cell 状态为 `matched`。
 - Kitty-Pro/MATH-Algebra 已完成 1187 个样本，exact-match=88.2056%，相对论文 88.12±1.26% 的差值为 +0.0856 个百分点，cell 状态为 `matched`；最终必做的 Table 3 为 5/5 matched。
 - Kitty/AIME24 已完成 30 个样本，batch8+FlashAttention2、32768 token 协议下 exact-match=73.3333%，相对论文 70.67±7.33% 的差值为 +2.6633 个百分点，cell 状态为 `matched`。
+- Kitty/AIME25 已完成 30 个样本，同一 batch8+FlashAttention2、32768 token 协议下 exact-match=60.0000%，相对论文 59.67±10.33% 的差值为 +0.3300 个百分点，cell 状态为 `matched`。
 
 ## 去重后的运行时间线
 
@@ -36,7 +37,7 @@
 
 ## 当前门禁与剩余工作
 
-总复现尚未完成。按最终必做清单，operator audit、Figure 5 和 Table 3（5/5 matched）已通过；Table 4 为 matched 1、missing 1；Figure 4 不要求。排除项不计入缺项。
+最终必做范围已完成：operator audit、Figure 5、Table 3（5/5 matched）和 Table 4（2/2 matched）全部通过；Figure 4、baseline 与排除的 Kitty 基础 Table 3 cells 不要求。
 
 后续按能够最快释放结果的顺序推进：
 

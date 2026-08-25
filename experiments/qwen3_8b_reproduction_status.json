@@ -13,7 +13,7 @@
       "kitty:aime25"
     ]
   },
-  "passed": false,
+  "passed": true,
   "operator_audit": {
     "passed": true,
     "path": "/home/yx/DartKV/experiments/kitty_operator_audit.json"
@@ -38,27 +38,14 @@
     "incomplete_cells": []
   },
   "table4": {
-    "passed": false,
+    "passed": true,
     "counts": {
-      "matched": 1,
+      "matched": 2,
       "outside_tolerance": 0,
-      "missing": 1
+      "missing": 0
     },
     "signature_issues": [],
-    "incomplete_cells": [
-      {
-        "variant": "kitty",
-        "task": "aime25",
-        "metric": "exact_match,none",
-        "target_percent": 59.67,
-        "paper_max_deviation": 10.33,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 10.33,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/kitty_summary.json"
-      }
-    ]
+    "incomplete_cells": []
   },
   "figure4": {
     "required": false,

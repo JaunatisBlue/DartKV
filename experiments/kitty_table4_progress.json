@@ -6,12 +6,12 @@
   "results_base": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B",
   "criterion": "absolute delta <= the paper's reported maximum deviation for each cell",
   "counts": {
-    "matched": 1,
+    "matched": 2,
     "outside_tolerance": 0,
-    "missing": 1
+    "missing": 0
   },
-  "complete": false,
-  "reproduced": false,
+  "complete": true,
+  "reproduced": true,
   "cells": [
     {
       "variant": "kitty",
@@ -31,10 +31,10 @@
       "metric": "exact_match,none",
       "target_percent": 59.67,
       "paper_max_deviation": 10.33,
-      "observed_percent": null,
-      "delta_points": null,
+      "observed_percent": 60.0,
+      "delta_points": 0.3299999999999983,
       "tolerance_points": 10.33,
-      "status": "missing",
+      "status": "matched",
       "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/aime25/kitty_summary.json"
     }
   ]
