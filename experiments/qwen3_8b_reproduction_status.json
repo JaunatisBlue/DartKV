@@ -30,9 +30,9 @@
   "table3": {
     "passed": false,
     "counts": {
-      "matched": 2,
+      "matched": 3,
       "outside_tolerance": 0,
-      "missing": 3
+      "missing": 2
     },
     "signature_issues": [],
     "incomplete_cells": [
@@ -59,18 +59,6 @@
         "tolerance_points": 1.26,
         "status": "missing",
         "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/minerva_math_algebra/kitty-pro_summary.json"
-      },
-      {
-        "variant": "kitty-pro",
-        "task": "humaneval_instruct",
-        "metric": "pass@1,create_test",
-        "target_percent": 81.34,
-        "paper_max_deviation": 3.41,
-        "observed_percent": null,
-        "delta_points": null,
-        "tolerance_points": 3.41,
-        "status": "missing",
-        "summary_path": "results/kitty_qwen8_paper_b16/paper/kitty-reference/Qwen-8B/humaneval_instruct/kitty-pro_summary.json"
       }
     ]
   },
