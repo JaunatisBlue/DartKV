@@ -1,0 +1,218 @@
+{
+  "measured_at": "2026-08-24",
+  "status": "endpoint_reproduced",
+  "hardware": {
+    "gpu": "NVIDIA A100 80GB",
+    "gpu_count_used": 1
+  },
+  "software": {
+    "python": "3.10.20",
+    "pytorch": "2.7.1+cu126",
+    "transformers": "4.53.2",
+    "triton": "3.3.1",
+    "flash_attention": "2.7.4.post1",
+    "kitty": "1.0.0"
+  },
+  "protocol": {
+    "model": "/opt/model/Qwen/Qwen-8B",
+    "prompt_source": "Kitty prompt_choice=1 with Qwen chat template",
+    "prompt_tokens": 100,
+    "maximum_sequence_length": 8192,
+    "dtype": "fp16",
+    "prefill_attention": "flash_attention_2",
+    "warmup_runs": 1,
+    "repeat_runs": 1,
+    "disable_compile": true
+  },
+  "paper_claim": {
+    "maximum_batch_size_gain": 8.0,
+    "throughput_gain_range": [2.1, 4.1]
+  },
+  "maximum_successful_batches": {
+    "hf_dynamic_fp16": {
+      "batch_size": 32,
+      "sequence_tokens_per_second": 314.284684610062,
+      "generated_tokens_per_second": 310.44820164363057,
+      "elapsed_ms": 834097.2781580058,
+      "peak_memory_allocated_bytes": 55609208320,
+      "kv_storage_bytes": 38649987072,
+      "result": "results/kitty_figure5_paper/Qwen-8B_dense_paper_b32_l8192.json"
+    },
+    "hf_static_fp16": {
+      "batch_size": 32,
+      "sequence_tokens_per_second": 611.7807510091127,
+      "generated_tokens_per_second": 604.3127242633959,
+      "elapsed_ms": 428493.3770269854,
+      "peak_memory_allocated_bytes": 55393537024,
+      "peak_memory_reserved_bytes": 55641636864,
+      "kv_storage_bytes": 38654705664,
+      "result": "results/kitty_figure5_paper/Qwen-8B_static_paper_b32_l8192.json"
+    },
+    "kitty_engine": {
+      "batch_size": 256,
+      "sequence_tokens_per_second": 1579.9303270954729,
+      "generated_tokens_per_second": 1560.6440682197956,
+      "elapsed_ms": 1327369.9251380167,
+      "peak_memory_allocated_bytes": 76519850496,
+      "kv_storage_bytes": 57387515904,
+      "dense_equivalent_kv_storage_bytes": 309237645312,
+      "kv_compression_ratio": 5.388587245154907,
+      "result": "results/kitty_figure5_paper/Qwen-8B_kitty-engine_paper_b256_l8192.json"
+    }
+  },
+  "curve_points": {
+    "hf_dynamic_fp16": [
+      {
+        "batch_size": 8,
+        "sequence_tokens_per_second": 157.40987763300362,
+        "generated_tokens_per_second": 155.48837033767887,
+        "peak_memory_allocated_bytes": 26197263872
+      },
+      {
+        "batch_size": 16,
+        "sequence_tokens_per_second": 258.915571043695,
+        "generated_tokens_per_second": 255.75498057685306,
+        "peak_memory_allocated_bytes": 36000343552,
+        "peak_memory_reserved_bytes": 77315702784
+      },
+      {
+        "batch_size": 32,
+        "sequence_tokens_per_second": 314.284684610062,
+        "generated_tokens_per_second": 310.44820164363057,
+        "peak_memory_allocated_bytes": 55609208320
+      }
+    ],
+    "hf_static_fp16": [
+      {
+        "batch_size": 32,
+        "sequence_tokens_per_second": 611.7807510091127,
+        "generated_tokens_per_second": 604.3127242633959,
+        "peak_memory_allocated_bytes": 55393537024,
+        "peak_memory_reserved_bytes": 55641636864
+      }
+    ],
+    "hf_kivi_int4_quanto": [
+      {
+        "batch_size": 32,
+        "sequence_tokens_per_second": 139.02348661868595,
+        "generated_tokens_per_second": 137.32642257304772,
+        "peak_memory_allocated_bytes": 31169482240,
+        "peak_memory_reserved_bytes": 59515076608,
+        "kv_storage_bytes": 10961879040,
+        "dense_equivalent_kv_storage_bytes": 38654705664,
+        "kv_compression_ratio": 3.526284638149045
+      }
+    ],
+    "kitty_engine": [
+      {
+        "batch_size": 8,
+        "sequence_tokens_per_second": 144.2832296406856,
+        "generated_tokens_per_second": 142.5219597476108,
+        "peak_memory_allocated_bytes": 18271364096
+      },
+      {
+        "batch_size": 32,
+        "sequence_tokens_per_second": 573.5382692839128,
+        "generated_tokens_per_second": 566.5370697076931,
+        "peak_memory_allocated_bytes": 23912270848,
+        "peak_memory_reserved_bytes": 24387780608
+      },
+      {
+        "batch_size": 64,
+        "sequence_tokens_per_second": 983.2272151738405,
+        "generated_tokens_per_second": 971.2249298323629,
+        "peak_memory_allocated_bytes": 31424830464,
+        "peak_memory_reserved_bytes": 31620857856
+      },
+      {
+        "batch_size": 128,
+        "sequence_tokens_per_second": 1374.2499332866482,
+        "generated_tokens_per_second": 1357.4744214057077,
+        "peak_memory_allocated_bytes": 46457814528,
+        "peak_memory_reserved_bytes": 47112519680
+      },
+      {
+        "batch_size": 256,
+        "sequence_tokens_per_second": 1579.9303270954729,
+        "generated_tokens_per_second": 1560.6440682197956,
+        "peak_memory_allocated_bytes": 76519850496
+      }
+    ]
+  },
+  "boundary_checks": {
+    "kitty_engine_batch_512": {
+      "status": "oom",
+      "stage": "static KV-cache allocation",
+      "error": "CUDA out of memory while allocating the Kitty KeyCache"
+    },
+    "hf_dynamic_fp16_batch_64": {
+      "status": "oom",
+      "stage": "warmup DynamicCache update",
+      "error": "CUDA out of memory while concatenating a new key-cache block",
+      "attempted_allocation_bytes": 931135488
+    },
+    "hf_static_fp16_batch_64": {
+      "status": "oom",
+      "stage": "static KV-cache allocation",
+      "error": "CUDA out of memory while allocating the StaticCache value tensor",
+      "attempted_allocation_bytes": 1073741824
+    }
+  },
+  "comparison": {
+    "maximum_batch_size_gain": 8.0,
+    "sequence_throughput_gain": 5.027067510641562,
+    "generated_throughput_gain": 5.027067510641562,
+    "sequence_throughput_gain_vs_static_fp16": 2.5825106862048677,
+    "batch_size_claim_reproduced": true,
+    "throughput_claim_met_or_exceeded": true,
+    "throughput_gain_above_reported_upper_bound_percent": 22.61140269857469
+  },
+  "final_native_kernel_reproduction": {
+    "operator_facade": "dart.kitty_kernels",
+    "cache": "kitty-engine",
+    "batch32": {
+      "sequence_tokens_per_second": 556.5326021851224,
+      "generated_tokens_per_second": 549.7389913186048,
+      "peak_memory_allocated_bytes": 23912270848,
+      "peak_memory_reserved_bytes": 24387780608,
+      "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b32_l8192.json"
+    },
+    "batch256": {
+      "sequence_tokens_per_second": 1574.65377705936,
+      "generated_tokens_per_second": 1555.431929194866,
+      "peak_memory_allocated_bytes": 76519850496,
+      "peak_memory_reserved_bytes": 77366034432,
+      "kv_compression_ratio": 5.388587403387601,
+      "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b256_l8192.json"
+    },
+    "batch128": {
+      "sequence_tokens_per_second": 1366.4232155876375,
+      "generated_tokens_per_second": 1349.743244694234,
+      "peak_memory_allocated_bytes": 46457814528,
+      "peak_memory_reserved_bytes": 47112519680,
+      "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b128_l8192.json"
+    },
+    "batch64": {
+      "sequence_tokens_per_second": 985.7463327659055,
+      "generated_tokens_per_second": 973.7132964772592,
+      "peak_memory_allocated_bytes": 31424830464,
+      "peak_memory_reserved_bytes": 31620857856,
+      "result": "results/kitty_final_figure5/Qwen-8B_kitty-engine_paper_b64_l8192.json"
+    },
+    "batch_size_gain": 8.0,
+    "generated_throughput_gain": 2.8294007770196625,
+    "paper_throughput_range": [2.1, 4.1],
+    "throughput_within_paper_range": true,
+    "batch512_boundary": {
+      "status": "oom",
+      "stage": "static KV-cache allocation",
+      "error": "CUDA out of memory while allocating the Kitty KeyCache"
+    }
+  },
+  "notes": [
+    "The checked-in Kitty artifact prompt has 1179 tokens after the Qwen chat template; paper mode trims it to the paper's approximately 100-token protocol.",
+    "Peak allocated memory is not directly comparable to nvidia-smi for DynamicCache because allocator reservation and fragmentation are excluded; future runs also record peak_memory_reserved_bytes.",
+    "Kitty is 2.58x faster than the maximum HF Static FP16 batch, inside the paper's reported 2.1x--4.1x range.",
+    "Kitty is 5.03x faster than HF Dynamic FP16 locally, above rather than below the paper's reported maximum gain."
+  ]
+}

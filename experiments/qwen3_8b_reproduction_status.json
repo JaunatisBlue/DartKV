@@ -1,0 +1,54 @@
+{
+  "scope": "user-selected Qwen3-8B Kitty cells; one complete repeat minimum",
+  "required_accuracy_cells": {
+    "table3": [
+      "kitty:humaneval_instruct",
+      "kitty-pro:gsm8k_cot_llama",
+      "kitty-pro:minerva_math_algebra",
+      "kitty-pro:humaneval_instruct",
+      "kitty-pro:gpqa_diamond_cot_n_shot"
+    ],
+    "table4": [
+      "kitty:aime24",
+      "kitty:aime25"
+    ]
+  },
+  "passed": true,
+  "operator_audit": {
+    "passed": true,
+    "path": "/home/yx/DartKV/experiments/kitty_operator_audit.json"
+  },
+  "figure5": {
+    "passed": true,
+    "missing_points": [],
+    "missing_result_files": [],
+    "batch_size_gain": 8.0,
+    "generated_throughput_gain": 2.8294007770196625,
+    "batch512_status": "oom",
+    "operator_facade": "dart.kitty_kernels"
+  },
+  "table3": {
+    "passed": true,
+    "counts": {
+      "matched": 5,
+      "outside_tolerance": 0,
+      "missing": 0
+    },
+    "signature_issues": [],
+    "incomplete_cells": []
+  },
+  "table4": {
+    "passed": true,
+    "counts": {
+      "matched": 2,
+      "outside_tolerance": 0,
+      "missing": 0
+    },
+    "signature_issues": [],
+    "incomplete_cells": []
+  },
+  "figure4": {
+    "required": false,
+    "reason": "excluded from the user-selected fast reproduction scope"
+  }
+}
